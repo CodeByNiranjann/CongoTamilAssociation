@@ -1,0 +1,349 @@
+/* src/css/pages.css */
+
+/* ---------- Section title ---------- */
+.section-title {
+  margin-bottom: 2.75rem;
+  text-align: center;
+}
+
+.section-title-left {
+  text-align: left;
+}
+
+.section-title-text {
+  margin-bottom: 0.6rem;
+  font-size: clamp(1.7rem, 3.5vw, 2.3rem);
+}
+
+.section-title-line {
+  display: block;
+  width: 80px;
+  height: 4px;
+  margin: 0 auto 1rem;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-dark));
+}
+
+.section-title-left .section-title-line {
+  margin-left: 0;
+}
+
+.section-title-subtitle {
+  max-width: 640px;
+  margin: 0 auto;
+  color: var(--color-muted);
+}
+
+.section-title-left .section-title-subtitle {
+  margin-left: 0;
+}
+
+/* ---------- Page header (inner pages) ---------- */
+.page-header {
+  padding: 4rem 0;
+  background:
+    radial-gradient(circle at 85% 20%, rgba(212, 160, 23, 0.22), transparent 45%),
+    linear-gradient(135deg, var(--color-primary-dark), var(--color-primary));
+  border-bottom: 4px solid var(--color-accent);
+  text-align: center;
+}
+
+.page-header-title {
+  margin-bottom: 0.6rem;
+  color: #fff;
+  font-size: clamp(1.9rem, 4.5vw, 2.8rem);
+}
+
+.page-header-text {
+  max-width: 700px;
+  margin: 0 auto;
+  color: #f3e6d3;
+  font-size: 1.05rem;
+}
+
+/* ---------- Committee page ---------- */
+.committee-group {
+  margin-bottom: 3.25rem;
+}
+
+.committee-year {
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--color-accent);
+  font-size: 1.5rem;
+}
+
+/* ---------- About, Tamil School, Africa Tamil Charal ---------- */
+.about-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  max-width: 900px;
+}
+
+.about-block-content {
+  flex: 1;
+}
+
+.about-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 58px;
+  height: 58px;
+  margin-bottom: 1rem;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-cream), #f7e2b3);
+  color: var(--color-primary);
+}
+
+.about-icon-center {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.about-card {
+  padding: 2rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.about-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.about-card-title {
+  font-size: 1.45rem;
+}
+
+.about-list {
+  padding-left: 1.2rem;
+  list-style: disc;
+}
+
+.about-list li {
+  margin-bottom: 0.55rem;
+}
+
+.about-photo {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.about-photo:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow-md);
+}
+
+/* ---------- Gallery and Publications search ---------- */
+.gallery-search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-width: 440px;
+  margin: 0 auto 2.5rem;
+}
+
+.gallery-search-label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.gallery-search-input {
+  padding: 0.75rem 1.1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition);
+}
+
+.gallery-search-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.25);
+}
+
+/* ---------- Anthem page ---------- */
+.anthem-card {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 2.5rem 1.75rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 4px solid var(--color-accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  text-align: center;
+}
+
+.anthem-description {
+  margin-bottom: 1.75rem;
+  white-space: pre-line;
+}
+
+.anthem-player {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.anthem-button {
+  min-width: 170px;
+  padding: 0.85rem 2.2rem;
+}
+
+@media (max-width: 640px) {
+  .page-header {
+    padding: 3rem 0;
+  }
+
+  .about-block {
+    flex-direction: column;
+    gap: 0;
+  }
+}
+
+/* ---------- By-Laws page ---------- */
+.bylaws-intro {
+  max-width: 800px;
+  margin: 0 auto 2rem;
+  text-align: center;
+  font-size: 1.05rem;
+}
+
+.bylaws-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.bylaws-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.1rem;
+  padding: 1.25rem 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 5px solid var(--color-accent);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.bylaws-number {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.bylaws-body {
+  flex: 1;
+}
+
+.bylaws-heading {
+  margin-bottom: 0.4rem;
+  font-size: 1.15rem;
+}
+
+.bylaws-text {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.bylaws-download {
+  margin-top: 2.5rem;
+}
+
+
+/* ---------- Contact page ---------- */
+.contact-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
+  gap: 3rem;
+  align-items: start;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  min-width: 0;
+}
+
+.contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.contact-item .about-icon {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.contact-label {
+  margin-bottom: 0.15rem;
+  font-size: 1.05rem;
+}
+
+.contact-address {
+  margin: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.contact-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+.contact-form {
+  margin: 0;
+  max-width: none;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.contact-form-title {
+  margin-bottom: 1.25rem;
+  font-size: 1.5rem;
+}
+
+.contact-form input,
+.contact-form textarea,
+.contact-form select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 860px) {
+  .contact-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+}
+
+
