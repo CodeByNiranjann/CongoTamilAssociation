@@ -482,4 +482,105 @@
   border-color: var(--color-border);
 }
 
+/* ---------- Admin select dropdown ---------- */
+.admin-field select {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  transition: var(--transition);
+}
+
+.admin-field select:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(212, 160, 23, 0.25);
+}
+
+.admin-field select[aria-invalid="true"] {
+  border-color: var(--color-error);
+}
+/* ---------- Admin audio preview ---------- */
+.admin-audio {
+  width: 100%;
+  max-width: 480px;
+}
+
+/* ---------- Admin spacing between sub-sections ---------- */
+.admin-section-gap {
+  margin-top: 2.5rem;
+}
+
+/* ---------- Admin applications: filter, status colors, detail panel ---------- */
+.admin-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.admin-filter label {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.admin-filter select {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+}
+
+select.admin-status {
+  padding: 0.3rem 0.6rem;
+}
+
+.admin-status-new {
+  background: #fff3dc;
+  border-color: var(--color-accent-dark);
+  color: var(--color-accent-dark);
+}
+
+.admin-status-contacted {
+  background: #e8eefb;
+  border-color: #3556a8;
+  color: #3556a8;
+}
+
+.admin-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-detail-list {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 0.6rem 1rem;
+  margin: 0;
+}
+
+.admin-detail-list dt {
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.admin-detail-list dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+@media (max-width: 640px) {
+  .admin-detail-list {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  .admin-detail-list dd {
+    margin-bottom: 0.6rem;
+  }
+}
 
