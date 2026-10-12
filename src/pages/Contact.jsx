@@ -1,17 +1,12 @@
 // src/pages/Contact.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Mail, Phone, MapPin, Send, Link as LinkIcon } from "lucide-react";
 
 import SectionTitle from "../components/SectionTitle.jsx";
 import Notification from "../components/Notification.jsx";
+import { apiGet, apiPost } from "../api.js";
 
-// TEMPORARY content. I have not invented any contact details.
-// Fill these in only with verified CTA information.
-// Anything left empty is hidden.
-// Later, all of this comes from the admin "Contact Information" section.
-//
-// socialLinks example: [{ name: "Facebook", url: "https://..." }]
-const contactInfo = {
+const emptyContactInfo = {
   email: "",
   phone: "",
   address: "",
@@ -26,10 +21,45 @@ const emptyForm = {
 };
 
 function Contact() {
+  const [contactInfo, setContactInfo] = useState(emptyContactInfo);
+  const [infoLoading, setInfoLoading] = useState(true);
+
   const [formData, setFormData] = useState(emptyForm);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState({ type: "info", message: "" });
+
+  // Load the real contact details from the backend
+  useEffect(function loadContactInfo() {
+    let isCancelled = false;
+
+    async function fetchInfo() {
+      try {
+        const result = await apiGet("/contact");
+
+        if (isCancelled === false) {
+          setContactInfo({
+            email: result.data.email || "",
+            phone: result.data.phone || "",
+            address: result.data.address || "",
+            socialLinks: result.data.socialLinks || [],
+          });
+        }
+      } catch (err) {
+        // Contact details are optional, so the form still works without them
+      } finally {
+        if (isCancelled === false) {
+          setInfoLoading(false);
+        }
+      }
+    }
+
+    fetchInfo();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   function handleChange(event) {
     const fieldName = event.target.name;
@@ -64,7 +94,7 @@ function Contact() {
     return newErrors;
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setNotice({ type: "info", message: "" });
 
@@ -79,15 +109,24 @@ function Contact() {
       return;
     }
 
-    // Backend is not connected yet, so nothing is sent or saved.
-    // Later: send formData to the contact API here.
     setSubmitting(true);
-    setNotice({
-      type: "info",
-      message:
-        "Form is valid. It is not sent yet because the backend is not connected.",
-    });
-    setSubmitting(false);
+
+    try {
+      const result = await apiPost("/contact/message", {
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        subject: formData.subject.trim(),
+        message: formData.message.trim(),
+      });
+
+      setNotice({ type: "success", message: result.message });
+      setFormData(emptyForm);
+      setErrors({});
+    } catch (err) {
+      setNotice({ type: "error", message: err.message });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function clearNotice() {
@@ -165,7 +204,7 @@ function Contact() {
           <ul className="contact-social">
             {contactInfo.socialLinks.map(function (link) {
               return (
-                <li key={link.url}>
+                <li key={link._id || link.url}>
                   <a href={link.url} target="_blank" rel="noopener noreferrer">
                     {link.name}
                   </a>
@@ -183,14 +222,34 @@ function Contact() {
     hasContactDetails = true;
   }
 
+  let infoContent = (
+    <p className="empty-state">Contact details will be added soon.</p>
+  );
+
+  if (infoLoading) {
+    infoContent = <p className="loading-state">Loading contact details...</p>;
+  } else if (hasContactDetails) {
+    infoContent = (
+      <ul className="contact-list">
+        {emailItem}
+        {phoneItem}
+        {addressItem}
+        {socialItem}
+      </ul>
+    );
+  }
+
+  let buttonText = "Send Message";
+  if (submitting) {
+    buttonText = "Sending...";
+  }
+
   return (
     <>
       <section className="page-header">
         <div className="container">
           <h1 className="page-header-title">Contact Us</h1>
-          <p className="page-header-text">
-            We would love to hear from you.
-          </p>
+          <p className="page-header-text">We would love to hear from you.</p>
         </div>
       </section>
 
@@ -198,21 +257,14 @@ function Contact() {
         <div className="container contact-layout">
           <div className="contact-info">
             <SectionTitle title="Get in Touch" align="left" />
-            {hasContactDetails ? (
-              <ul className="contact-list">
-                {emailItem}
-                {phoneItem}
-                {addressItem}
-                {socialItem}
-              </ul>
-            ) : (
-              <p className="empty-state">
-                Contact details will be added soon.
-              </p>
-            )}
+            {infoContent}
           </div>
 
-          <form className="public-form contact-form" onSubmit={handleSubmit} noValidate>
+          <form
+            className="public-form contact-form"
+            onSubmit={handleSubmit}
+            noValidate
+          >
             <h2 className="contact-form-title">Send a Message</h2>
 
             <Notification
@@ -280,7 +332,7 @@ function Contact() {
               className="btn btn-primary"
               disabled={submitting}
             >
-              <Send size={18} /> Send Message
+              <Send size={18} /> {buttonText}
             </button>
           </form>
         </div>

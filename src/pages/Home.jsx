@@ -1,5 +1,5 @@
 // src/pages/Home.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Video, Users, Eye } from "lucide-react";
 
@@ -9,77 +9,137 @@ import Announcement from "../components/Announcement.jsx";
 import EventCard from "../components/EventCard.jsx";
 import FestivalCard from "../components/FestivalCard.jsx";
 import JoinCTA from "../components/JoinCTA.jsx";
+import { apiGet, apiPost } from "../api.js";
 
-// Fill these in only with verified CTA details.
-// Anything left empty is hidden or shows a placeholder.
-const youtubeUrl = "";
+// Put the real committee group photo path or link here,
+// for example "/images/committee-group.jpg" (file inside the public/images folder).
 const groupPhotoUrl = "";
 
-// TEMPORARY sample data (generic text, not official CTA content).
-// Each list is replaced by a real API call when the backend is ready.
-const sampleBanners = [
-  {
-    _id: "b1",
-    imageUrl: "",
-    title: "Congo Tamil Association",
-    description: "Sample banner one",
-    buttonText: "About Us",
-    buttonLink: "/about",
-  },
-  {
-    _id: "b2",
-    imageUrl: "",
-    title: "Our Community",
-    description: "Sample banner two",
-    buttonText: "Join CTA",
-    buttonLink: "/join-cta",
-  },
-];
+const VISIT_KEY = "cta_visit_recorded";
 
-const sampleAnnouncements = [
-  {
-    _id: "a1",
-    title: "Sample announcement",
-    message: "Real announcements come from the admin dashboard.",
-    date: "2026-10-10",
-  },
-];
+// Returns true if the date is today or in the future
+function isUpcoming(dateValue) {
+  const date = new Date(dateValue);
 
-const sampleEvents = [
-  {
-    _id: "e1",
-    title: "Sample upcoming event",
-    date: "2027-01-20",
-    location: "Sample location",
-    description: "Real events come from the admin dashboard.",
-    imageUrl: "",
-    galleryLink: "",
-  },
-];
+  if (isNaN(date.getTime())) {
+    return false;
+  }
 
-const sampleFestivals = [
-  {
-    _id: "f1",
-    title: "Sample festival",
-    date: "2027-01-14",
-    description: "Real festivals come from the admin dashboard.",
-    imageUrl: "",
-    galleryLink: "",
-  },
-];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-// Sample number only. The real count comes from the visitor API later.
-const sampleVisitorTotal = 0;
+  return date >= today;
+}
 
 function Home() {
-  // Later: replace each useState with data loaded from the backend,
-  // and set loading/error from the request.
-  const [banners] = useState(sampleBanners);
-  const [announcements] = useState(sampleAnnouncements);
-  const [events] = useState(sampleEvents);
-  const [festivals] = useState(sampleFestivals);
-  const [visitorTotal] = useState(sampleVisitorTotal);
-  const [loading] = useState(false);
+  const [banners, setBanners] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [festivals, setFestivals] = useState([]);
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [visitorTotal, setVisitorTotal] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Load everything for the page. Each request is independent, so one
+  // failing request does not stop the others from showing.
+  useEffect(function loadHomeData() {
+    let isCancelled = false;
+
+    async function fetchAll() {
+      const results = await Promise.allSettled([
+        apiGet("/banners"),
+        apiGet("/announcements?section=home"),
+        apiGet("/events"),
+        apiGet("/festivals"),
+        apiGet("/contact"),
+      ]);
+
+      if (isCancelled) {
+        return;
+      }
+
+      if (results[0].status === "fulfilled") {
+        setBanners(results[0].value.data);
+      }
+
+      if (results[1].status === "fulfilled") {
+        setAnnouncements(results[1].value.data);
+      }
+
+      if (results[2].status === "fulfilled") {
+        const upcomingEvents = results[2].value.data.filter(function (item) {
+          return isUpcoming(item.date);
+        });
+        setEvents(upcomingEvents.slice(0, 3));
+      }
+
+      if (results[3].status === "fulfilled") {
+        const all = results[3].value.data;
+
+        const upcoming = all.filter(function (item) {
+          return isUpcoming(item.date);
+        });
+
+        const past = all
+          .filter(function (item) {
+            return isUpcoming(item.date) === false;
+          })
+          .reverse();
+
+        // Upcoming festivals first, then the most recent past ones
+        setFestivals(upcoming.concat(past).slice(0, 3));
+      }
+
+      if (results[4].status === "fulfilled") {
+        setYoutubeUrl(results[4].value.data.youtubeUrl || "");
+      }
+
+      const allFailed = results.every(function (item) {
+        return item.status === "rejected";
+      });
+
+      if (allFailed) {
+        setError("Cannot reach the server. Please try again later.");
+      }
+
+      setLoading(false);
+    }
+
+    fetchAll();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
+
+  // Record one visit per browser session, then show the total.
+  useEffect(function recordVisitAndLoadTotal() {
+    let isCancelled = false;
+
+    async function countVisit() {
+      try {
+        if (sessionStorage.getItem(VISIT_KEY) !== "yes") {
+          sessionStorage.setItem(VISIT_KEY, "yes");
+          await apiPost("/visitors/hit", {});
+        }
+
+        const result = await apiGet("/visitors/total");
+
+        if (isCancelled === false) {
+          setVisitorTotal(result.total);
+        }
+      } catch (err) {
+        // The counter is not important enough to show an error for
+      }
+    }
+
+    countVisit();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   let youtubeSection = null;
   if (youtubeUrl) {
@@ -113,9 +173,27 @@ function Home() {
     );
   }
 
+  let visitorSection = null;
+  if (visitorTotal !== null) {
+    visitorSection = (
+      <section className="visitor-counter">
+        <div className="container">
+          <Eye size={18} aria-hidden="true" />
+          <span>Website visits: {visitorTotal}</span>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <>
       <HeroBanner banners={banners} loading={loading} />
+
+      {error && (
+        <div className="container">
+          <p className="alert alert-error">{error}</p>
+        </div>
+      )}
 
       {/* Announcements */}
       <section className="section">
@@ -152,7 +230,9 @@ function Home() {
             title="Upcoming Events"
             subtitle="Join us at our next gathering"
           />
-          {events.length === 0 ? (
+          {loading ? (
+            <p className="loading-state">Loading events...</p>
+          ) : events.length === 0 ? (
             <p className="empty-state">No upcoming events right now.</p>
           ) : (
             <div className="grid grid-3">
@@ -171,7 +251,9 @@ function Home() {
             title="Festivals and Activities"
             subtitle="Celebrating our culture together"
           />
-          {festivals.length === 0 ? (
+          {loading ? (
+            <p className="loading-state">Loading festivals...</p>
+          ) : festivals.length === 0 ? (
             <p className="empty-state">Festival details will be added soon.</p>
           ) : (
             <div className="grid grid-3">
@@ -206,13 +288,7 @@ function Home() {
 
       <JoinCTA />
 
-      {/* Visitor counter */}
-      <section className="visitor-counter">
-        <div className="container">
-          <Eye size={18} aria-hidden="true" />
-          <span>Website visitors: {visitorTotal}</span>
-        </div>
-      </section>
+      {visitorSection}
     </>
   );
 }

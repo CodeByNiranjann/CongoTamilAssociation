@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Send, Upload } from "lucide-react";
 
 import Notification from "../components/Notification.jsx";
+import { apiPost } from "../api.js";
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -30,6 +31,7 @@ function getFileExtension(fileName) {
 function JobSeeking() {
   const [formData, setFormData] = useState(emptyForm);
   const [cvFile, setCvFile] = useState(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [notice, setNotice] = useState({ type: "info", message: "" });
@@ -111,7 +113,7 @@ function JobSeeking() {
     return newErrors;
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setNotice({ type: "info", message: "" });
 
@@ -126,15 +128,33 @@ function JobSeeking() {
       return;
     }
 
-    // Backend is not connected yet, so nothing is sent or saved.
-    // Later: send formData and cvFile with FormData to the API here.
+    // Files are sent as FormData. The CV field name must be "cv".
+    const body = new FormData();
+    body.append("name", formData.name.trim());
+    body.append("phone", formData.phone.trim());
+    body.append("email", formData.email.trim());
+    body.append("company", formData.company.trim());
+    body.append("jobTitle", formData.jobTitle.trim());
+    body.append("skills", formData.skills.trim());
+    body.append("experience", formData.experience);
+    body.append("location", formData.location.trim());
+    body.append("cv", cvFile);
+
     setSubmitting(true);
-    setNotice({
-      type: "info",
-      message:
-        "Form is valid. It is not saved yet because the backend is not connected.",
-    });
-    setSubmitting(false);
+
+    try {
+      const result = await apiPost("/job-seekers", body);
+
+      setNotice({ type: "success", message: result.message });
+      setFormData(emptyForm);
+      setCvFile(null);
+      setFileInputKey(fileInputKey + 1);
+      setErrors({});
+    } catch (err) {
+      setNotice({ type: "error", message: err.message });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function clearNotice() {
@@ -157,6 +177,11 @@ function JobSeeking() {
       return "true";
     }
     return "false";
+  }
+
+  let buttonText = "Submit Application";
+  if (submitting) {
+    buttonText = "Sending...";
   }
 
   return (
@@ -281,6 +306,7 @@ function JobSeeking() {
                   {MAX_FILE_SIZE_MB} MB)
                 </label>
                 <input
+                  key={fileInputKey}
                   id="js-cv"
                   name="cv"
                   type="file"
@@ -310,7 +336,7 @@ function JobSeeking() {
               className="btn btn-primary"
               disabled={submitting}
             >
-              <Send size={18} /> Submit Application
+              <Send size={18} /> {buttonText}
             </button>
           </form>
         </div>

@@ -1,36 +1,78 @@
 // src/pages/TamilSchool.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { GraduationCap, BookOpen } from "lucide-react";
 
 import SectionTitle from "../components/SectionTitle.jsx";
 import Announcement from "../components/Announcement.jsx";
+import { apiGet } from "../api.js";
 
-// TEMPORARY content. I have not invented any school details, timings, or fees.
-// Replace these with the official Tamil School information.
-// Anything left empty shows a "will be added soon" message.
-// Later, all of this comes from the admin "Tamil School" section.
-const sampleSchool = {
+const emptySchool = {
   introduction: "",
   activities: [],
   images: [],
 };
 
-const sampleAnnouncements = [
-  {
-    _id: "ts1",
-    title: "Sample school announcement",
-    message: "Real announcements come from the admin dashboard.",
-    date: "2026-10-10",
-  },
-];
-
 function TamilSchool() {
-  // Later: replace with data loaded from the backend,
-  // and set loading/error from the request.
-  const [school] = useState(sampleSchool);
-  const [announcements] = useState(sampleAnnouncements);
-  const [loading] = useState(false);
-  const [error] = useState("");
+  const [school, setSchool] = useState(emptySchool);
+  const [announcements, setAnnouncements] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(function loadTamilSchool() {
+    let isCancelled = false;
+
+    async function fetchAll() {
+      try {
+        const results = await Promise.all([
+          apiGet("/tamil-school"),
+          apiGet("/announcements?section=tamil-school"),
+        ]);
+
+        if (isCancelled === false) {
+          setSchool({
+            introduction: results[0].data.introduction || "",
+            activities: results[0].data.activities || [],
+            images: results[0].data.images || [],
+          });
+          setAnnouncements(results[1].data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchAll();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <section className="section">
+        <div className="container">
+          <p className="loading-state">Loading Tamil School...</p>
+        </div>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="section">
+        <div className="container">
+          <p className="alert alert-error">{error}</p>
+        </div>
+      </section>
+    );
+  }
 
   let introContent = (
     <p className="empty-state">School information will be added soon.</p>
@@ -71,26 +113,6 @@ function TamilSchool() {
               );
             })}
           </div>
-        </div>
-      </section>
-    );
-  }
-
-  if (loading) {
-    return (
-      <section className="section">
-        <div className="container">
-          <p className="loading-state">Loading Tamil School...</p>
-        </div>
-      </section>
-    );
-  }
-
-  if (error) {
-    return (
-      <section className="section">
-        <div className="container">
-          <p className="alert alert-error">{error}</p>
         </div>
       </section>
     );

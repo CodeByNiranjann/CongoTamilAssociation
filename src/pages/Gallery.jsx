@@ -1,59 +1,44 @@
 // src/pages/Gallery.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import SectionTitle from "../components/SectionTitle.jsx";
 import GalleryCard from "../components/GalleryCard.jsx";
-
-// TEMPORARY sample data (generic text, not official CTA content).
-// Replaced by a real API call when the backend is ready.
-const sampleGalleries = [
-  {
-    _id: "g1",
-    title: "Sample album without cover",
-    date: "2026-06-10",
-    description: "Real albums come from the admin dashboard.",
-    coverImageUrl: "",
-    albumLink: "",
-  },
-  {
-    _id: "g2",
-    title: "Sample album with cover",
-    date: "2026-08-22",
-    description: "Click the image to open the larger view.",
-    coverImageUrl: "https://picsum.photos/id/1015/900/600",
-    albumLink: "https://drive.google.com",
-  },
-  {
-    _id: "g3",
-    title: "Sample older album",
-    date: "2025-12-05",
-    description: "Albums are shown newest first.",
-    coverImageUrl: "https://picsum.photos/id/1011/900/600",
-    albumLink: "https://drive.google.com",
-  },
-];
-
-// Returns a copy of the list sorted with the newest date first
-function sortNewestFirst(items) {
-  const copy = items.slice();
-
-  copy.sort(function (a, b) {
-    const first = new Date(a.date).getTime();
-    const second = new Date(b.date).getTime();
-
-    return second - first;
-  });
-
-  return copy;
-}
+import { apiGet } from "../api.js";
 
 function Gallery() {
-  // Later: replace with data loaded from the backend,
-  // and set loading/error from the request.
-  const [galleries] = useState(sampleGalleries);
-  const [loading] = useState(false);
-  const [error] = useState("");
+  const [galleries, setGalleries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchText, setSearchText] = useState("");
+
+  useEffect(function loadGalleries() {
+    let isCancelled = false;
+
+    async function fetchGalleries() {
+      try {
+        // The backend already sends albums newest first
+        const result = await apiGet("/gallery");
+
+        if (isCancelled === false) {
+          setGalleries(result.data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchGalleries();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   function handleSearchChange(event) {
     setSearchText(event.target.value);
@@ -77,14 +62,12 @@ function Gallery() {
       return gallery.title.toLowerCase().includes(searchWord);
     });
 
-    const sortedGalleries = sortNewestFirst(matchingGalleries);
-
-    if (sortedGalleries.length === 0) {
+    if (matchingGalleries.length === 0) {
       content = <p className="empty-state">No albums match your search.</p>;
     } else {
       content = (
         <div className="grid grid-3">
-          {sortedGalleries.map(function (gallery) {
+          {matchingGalleries.map(function (gallery) {
             return <GalleryCard key={gallery._id} gallery={gallery} />;
           })}
         </div>

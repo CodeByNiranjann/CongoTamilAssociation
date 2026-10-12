@@ -1,26 +1,8 @@
 // src/admin/sections/Committee.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
-// TEMPORARY sample data (placeholder names, not real CTA members).
-// Add, edit and delete only change this page's memory for now.
-// They are connected to the real backend API later.
-const startingMembers = [
-  {
-    _id: "m1",
-    name: "Sample Member One",
-    role: "Sample Role",
-    year: "2026",
-    bio: "",
-  },
-  {
-    _id: "m2",
-    name: "Sample Member Two",
-    role: "Sample Role",
-    year: "2025",
-    bio: "",
-  },
-];
+import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
 
 const emptyForm = {
   name: "",
@@ -30,12 +12,46 @@ const emptyForm = {
 };
 
 function Committee() {
-  const [members, setMembers] = useState(startingMembers);
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
+  const [serverError, setServerError] = useState("");
   const [deleteId, setDeleteId] = useState("");
+
+  // Load the real list from the backend when the page opens
+  useEffect(function loadMembers() {
+    let isCancelled = false;
+
+    async function fetchMembers() {
+      try {
+        const result = await apiGet("/committee");
+
+        if (isCancelled === false) {
+          setMembers(result.data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setLoadError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchMembers();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   function handleChange(event) {
     const fieldName = event.target.name;
@@ -72,9 +88,10 @@ function Committee() {
     setErrors({});
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setMessage("");
+    setServerError("");
 
     const newErrors = validateForm();
     setErrors(newErrors);
@@ -90,22 +107,34 @@ function Committee() {
       bio: formData.bio.trim(),
     };
 
-    if (editingId) {
-      const updatedMembers = members.map(function (member) {
-        if (member._id === editingId) {
-          return { ...member, ...cleanData };
-        }
-        return member;
-      });
-      setMembers(updatedMembers);
-      setMessage("Committee member updated.");
-    } else {
-      const newMember = { _id: "local-" + Date.now(), ...cleanData };
-      setMembers([newMember, ...members]);
-      setMessage("Committee member added.");
-    }
+    setSaving(true);
 
-    resetForm();
+    try {
+      if (editingId) {
+        const result = await apiPut("/committee/" + editingId, cleanData, true);
+
+        setMembers(
+          members.map(function (member) {
+            if (member._id === editingId) {
+              return result.data;
+            }
+            return member;
+          })
+        );
+        setMessage("Committee member updated.");
+      } else {
+        const result = await apiPost("/committee", cleanData, true);
+
+        setMembers([result.data, ...members]);
+        setMessage("Committee member added.");
+      }
+
+      resetForm();
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function startEdit(member) {
@@ -118,19 +147,31 @@ function Committee() {
     });
     setErrors({});
     setMessage("");
+    setServerError("");
     window.scrollTo(0, 0);
   }
 
-  function confirmDelete(id) {
-    const remainingMembers = members.filter(function (member) {
-      return member._id !== id;
-    });
-    setMembers(remainingMembers);
-    setDeleteId("");
-    setMessage("Committee member deleted.");
+  async function confirmDelete(id) {
+    setMessage("");
+    setServerError("");
 
-    if (editingId === id) {
-      resetForm();
+    try {
+      await apiDelete("/committee/" + id, true);
+
+      setMembers(
+        members.filter(function (member) {
+          return member._id !== id;
+        })
+      );
+      setMessage("Committee member deleted.");
+
+      if (editingId === id) {
+        resetForm();
+      }
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setDeleteId("");
     }
   }
 
@@ -141,11 +182,100 @@ function Committee() {
     submitText = "Save Changes";
   }
 
+  if (saving) {
+    submitText = "Saving...";
+  }
+
+  let listContent = null;
+
+  if (loading) {
+    listContent = <p className="loading-state">Loading committee members...</p>;
+  } else if (loadError) {
+    listContent = <p className="alert alert-error">{loadError}</p>;
+  } else if (members.length === 0) {
+    listContent = <p className="empty-state">No committee members yet.</p>;
+  } else {
+    listContent = (
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Role</th>
+            <th>Year</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {members.map(function (member) {
+            const isDeleting = deleteId === member._id;
+
+            return (
+              <tr key={member._id}>
+                <td>{member.name}</td>
+                <td>{member.role}</td>
+                <td>{member.year}</td>
+                <td>
+                  {isDeleting ? (
+                    <div className="admin-confirm">
+                      <span>Delete this member?</span>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        onClick={function () {
+                          confirmDelete(member._id);
+                        }}
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        onClick={function () {
+                          setDeleteId("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="admin-row-actions">
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        aria-label={"Edit " + member.name}
+                        onClick={function () {
+                          startEdit(member);
+                        }}
+                      >
+                        <Pencil size={16} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        aria-label={"Delete " + member.name}
+                        onClick={function () {
+                          setDeleteId(member._id);
+                        }}
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  }
+
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">Committee</h2>
 
       {message && <div className="alert alert-success">{message}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
 
       {/* Add / edit form */}
       <form className="admin-form" onSubmit={handleSubmit} noValidate>
@@ -209,7 +339,7 @@ function Committee() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-primary" disabled={saving}>
             <Plus size={18} /> {submitText}
           </button>
           {editingId && (
@@ -221,83 +351,7 @@ function Committee() {
       </form>
 
       {/* Members list */}
-      <div className="admin-table-wrap">
-        {members.length === 0 ? (
-          <p className="empty-state">No committee members yet.</p>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Year</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map(function (member) {
-                const isDeleting = deleteId === member._id;
-
-                return (
-                  <tr key={member._id}>
-                    <td>{member.name}</td>
-                    <td>{member.role}</td>
-                    <td>{member.year}</td>
-                    <td>
-                      {isDeleting ? (
-                        <div className="admin-confirm">
-                          <span>Delete this member?</span>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            onClick={function () {
-                              confirmDelete(member._id);
-                            }}
-                          >
-                            Yes, delete
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            onClick={function () {
-                              setDeleteId("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="admin-row-actions">
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            aria-label={"Edit " + member.name}
-                            onClick={function () {
-                              startEdit(member);
-                            }}
-                          >
-                            <Pencil size={16} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            aria-label={"Delete " + member.name}
-                            onClick={function () {
-                              setDeleteId(member._id);
-                            }}
-                          >
-                            <Trash2 size={16} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <div className="admin-table-wrap">{listContent}</div>
     </div>
   );
 }

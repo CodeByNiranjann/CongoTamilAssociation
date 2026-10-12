@@ -1,52 +1,63 @@
 // src/pages/AfricaTamilCharal.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Newspaper, FileText } from "lucide-react";
 
 import SectionTitle from "../components/SectionTitle.jsx";
 import Announcement from "../components/Announcement.jsx";
 import PublicationCard from "../components/PublicationCard.jsx";
+import { apiGet } from "../api.js";
 
-// TEMPORARY content. I have not invented any details about Africa Tamil Charal.
-// Replace these with the official information.
-// Anything left empty shows a "will be added soon" message.
-// Later, all of this comes from the admin "Africa Tamil Charal" section.
-const sampleInfo = {
+const emptyInfo = {
   introduction: "",
   images: [],
-  documents: [],
 };
 
-const sampleAnnouncements = [
-  {
-    _id: "atc1",
-    title: "Sample announcement",
-    message: "Real announcements come from the admin dashboard.",
-    date: "2026-10-10",
-  },
-];
-
-const samplePublications = [
-  {
-    _id: "atp1",
-    title: "Sample publication",
-    month: 9,
-    year: 2026,
-    description: "Real publications come from the admin dashboard.",
-    coverImageUrl: "",
-    pdfLink: "",
-  },
-];
-
-// Each document object looks like this: { _id, title, link }
-
 function AfricaTamilCharal() {
-  // Later: replace with data loaded from the backend,
-  // and set loading/error from the request.
-  const [info] = useState(sampleInfo);
-  const [announcements] = useState(sampleAnnouncements);
-  const [publications] = useState(samplePublications);
-  const [loading] = useState(false);
-  const [error] = useState("");
+  const [info, setInfo] = useState(emptyInfo);
+  const [announcements, setAnnouncements] = useState([]);
+  const [publications, setPublications] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(function loadAfricaTamilCharal() {
+    let isCancelled = false;
+
+    async function fetchAll() {
+      try {
+        const results = await Promise.all([
+          apiGet("/africa-tamil-charal"),
+          apiGet("/announcements?section=africa-tamil-charal"),
+          apiGet("/publications?section=africa-tamil-charal"),
+          apiGet("/africa-tamil-charal/documents"),
+        ]);
+
+        if (isCancelled === false) {
+          setInfo({
+            introduction: results[0].data.introduction || "",
+            images: results[0].data.images || [],
+          });
+          setAnnouncements(results[1].data);
+          setPublications(results[2].data);
+          setDocuments(results[3].data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchAll();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (
@@ -91,13 +102,13 @@ function AfricaTamilCharal() {
   }
 
   let documentsSection = null;
-  if (info.documents.length > 0) {
+  if (documents.length > 0) {
     documentsSection = (
       <section className="section section-alt">
         <div className="container">
           <SectionTitle title="Documents" />
           <ul className="about-list">
-            {info.documents.map(function (document) {
+            {documents.map(function (document) {
               return (
                 <li key={document._id}>
                   <a

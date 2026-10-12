@@ -1,9 +1,10 @@
 // src/admin/AdminDashboard.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import AdminNavbar from "./AdminNavbar.jsx";
 import AdminSidebar from "./AdminSidebar.jsx";
+import { apiGet } from "../api.js";
 
 const TOKEN_KEY = "cta_admin_token";
 
@@ -13,14 +14,61 @@ function AdminDashboard() {
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Later: load these from the backend (new join enquiries and new job applications).
-  // They stay 0 until the real API is connected, so nothing is faked.
-  const [newJoinCount] = useState(0);
-  const [newJobCount] = useState(0);
+  // Real counts from the backend. null means "not loaded yet".
+  const [newJoinCount, setNewJoinCount] = useState(0);
+  const [newJobCount, setNewJobCount] = useState(0);
+  const [visitorStats, setVisitorStats] = useState({
+    today: null,
+    month: null,
+    total: null,
+  });
+  const [statsError, setStatsError] = useState("");
 
-  // Later: load these from the visitor statistics API.
-  // null means "not available yet".
-  const [visitorStats] = useState({ today: null, month: null, total: null });
+  // Reload the counts every time the admin moves to another page,
+  // so the badges drop after statuses are changed.
+  useEffect(
+    function loadDashboardData() {
+      let isCancelled = false;
+
+      async function fetchAll() {
+        const results = await Promise.allSettled([
+          apiGet("/join-enquiries/new-count", true),
+          apiGet("/job-seekers/new-count", true),
+          apiGet("/visitors/stats", true),
+        ]);
+
+        if (isCancelled) {
+          return;
+        }
+
+        if (results[0].status === "fulfilled") {
+          setNewJoinCount(results[0].value.count);
+        }
+
+        if (results[1].status === "fulfilled") {
+          setNewJobCount(results[1].value.count);
+        }
+
+        if (results[2].status === "fulfilled") {
+          setVisitorStats({
+            today: results[2].value.today,
+            month: results[2].value.month,
+            total: results[2].value.total,
+          });
+          setStatsError("");
+        } else {
+          setStatsError("Could not load visitor statistics.");
+        }
+      }
+
+      fetchAll();
+
+      return function cleanup() {
+        isCancelled = true;
+      };
+    },
+    [location.pathname]
+  );
 
   function openSidebar() {
     setIsSidebarOpen(true);
@@ -58,13 +106,15 @@ function AdminDashboard() {
       <div className="admin-section">
         <h2 className="admin-section-title">Dashboard</h2>
 
+        {statsError && <div className="alert alert-error">{statsError}</div>}
+
         <div className="stat-grid">
           <div className="stat-card">
-            <span className="stat-label">Visitors today</span>
+            <span className="stat-label">Visits today</span>
             <span className="stat-value">{showStat(visitorStats.today)}</span>
           </div>
           <div className="stat-card">
-            <span className="stat-label">Visitors this month</span>
+            <span className="stat-label">Visits this month</span>
             <span className="stat-value">{showStat(visitorStats.month)}</span>
           </div>
           <div className="stat-card">
@@ -85,8 +135,9 @@ function AdminDashboard() {
         </div>
 
         <p className="admin-note">
-          Visitor numbers show "--" until the visitor API is connected. Choose a
-          section from the menu to manage the website content.
+          Visits are counted once per browser session, so they are not a count
+          of unique people. Choose a section from the menu to manage the
+          website content.
         </p>
       </div>
     );

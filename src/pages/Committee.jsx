@@ -1,33 +1,9 @@
 // src/pages/Committee.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
 import SectionTitle from "../components/SectionTitle.jsx";
 import CommitteeCard from "../components/CommitteeCard.jsx";
-
-// TEMPORARY sample data (placeholder names, not real CTA members).
-// This is replaced by a real API call when the backend is ready.
-const sampleMembers = [
-  {
-    _id: "m1",
-    name: "Sample Member One",
-    role: "Sample Role",
-    year: "2026",
-    bio: "This is sample text. Real members come from the admin dashboard.",
-  },
-  {
-    _id: "m2",
-    name: "Sample Member Two",
-    role: "Sample Role",
-    year: "2026",
-    bio: "",
-  },
-  {
-    _id: "m3",
-    name: "Sample Member Three",
-    role: "Sample Role",
-    year: "2025",
-    bio: "",
-  },
-];
+import { apiGet } from "../api.js";
 
 // Groups members by year and returns years sorted from newest to oldest
 function groupMembersByYear(members) {
@@ -53,10 +29,37 @@ function groupMembersByYear(members) {
 }
 
 function Committee() {
-  // Later: replace with data from the backend, and set loading/error from the request
-  const [members] = useState(sampleMembers);
-  const [loading] = useState(false);
-  const [error] = useState("");
+  const [members, setMembers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(function loadCommittee() {
+    let isCancelled = false;
+
+    async function fetchMembers() {
+      try {
+        const result = await apiGet("/committee");
+
+        if (isCancelled === false) {
+          setMembers(result.data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchMembers();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (

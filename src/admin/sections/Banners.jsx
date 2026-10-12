@@ -1,32 +1,11 @@
 // src/admin/sections/Banners.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 
-// TEMPORARY sample data (generic text, not official CTA content).
-// Add, edit, delete, reorder and publish only change this page's memory for now.
-// They are connected to the real backend API later.
-// Image upload: for now you paste an image URL. Later this becomes a file upload to Cloudinary.
-const startingBanners = [
-  {
-    _id: "b1",
-    title: "Sample banner one",
-    description: "Sample description",
-    imageUrl: "",
-    buttonText: "About Us",
-    buttonLink: "/about",
-    isPublished: true,
-  },
-  {
-    _id: "b2",
-    title: "Sample banner two",
-    description: "",
-    imageUrl: "",
-    buttonText: "",
-    buttonLink: "",
-    isPublished: false,
-  },
-];
+import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
 
+// Image: for now you paste an image URL. A real file upload to Cloudinary
+// can be added later.
 const emptyForm = {
   title: "",
   description: "",
@@ -37,12 +16,46 @@ const emptyForm = {
 };
 
 function Banners() {
-  const [banners, setBanners] = useState(startingBanners);
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
+  const [serverError, setServerError] = useState("");
   const [deleteId, setDeleteId] = useState("");
+
+  // Load all banners (including drafts) from the backend
+  useEffect(function loadBanners() {
+    let isCancelled = false;
+
+    async function fetchBanners() {
+      try {
+        const result = await apiGet("/banners/admin", true);
+
+        if (isCancelled === false) {
+          setBanners(result.data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setLoadError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchBanners();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   function handleChange(event) {
     const fieldName = event.target.name;
@@ -89,9 +102,10 @@ function Banners() {
     setErrors({});
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setMessage("");
+    setServerError("");
 
     const newErrors = validateForm();
     setErrors(newErrors);
@@ -109,22 +123,34 @@ function Banners() {
       isPublished: formData.isPublished,
     };
 
-    if (editingId) {
-      const updatedBanners = banners.map(function (banner) {
-        if (banner._id === editingId) {
-          return { ...banner, ...cleanData };
-        }
-        return banner;
-      });
-      setBanners(updatedBanners);
-      setMessage("Banner updated.");
-    } else {
-      const newBanner = { _id: "local-" + Date.now(), ...cleanData };
-      setBanners([...banners, newBanner]);
-      setMessage("Banner added.");
-    }
+    setSaving(true);
 
-    resetForm();
+    try {
+      if (editingId) {
+        const result = await apiPut("/banners/" + editingId, cleanData, true);
+
+        setBanners(
+          banners.map(function (banner) {
+            if (banner._id === editingId) {
+              return result.data;
+            }
+            return banner;
+          })
+        );
+        setMessage("Banner updated.");
+      } else {
+        const result = await apiPost("/banners", cleanData, true);
+
+        setBanners([...banners, result.data]);
+        setMessage("Banner added.");
+      }
+
+      resetForm();
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function startEdit(banner) {
@@ -139,44 +165,91 @@ function Banners() {
     });
     setErrors({});
     setMessage("");
+    setServerError("");
     window.scrollTo(0, 0);
   }
 
-  function togglePublished(id) {
-    const updatedBanners = banners.map(function (banner) {
-      if (banner._id === id) {
-        return { ...banner, isPublished: !banner.isPublished };
-      }
-      return banner;
-    });
-    setBanners(updatedBanners);
+  async function togglePublished(banner) {
+    setMessage("");
+    setServerError("");
+
+    try {
+      const result = await apiPut(
+        "/banners/" + banner._id,
+        { isPublished: !banner.isPublished },
+        true
+      );
+
+      setBanners(
+        banners.map(function (item) {
+          if (item._id === banner._id) {
+            return result.data;
+          }
+          return item;
+        })
+      );
+    } catch (err) {
+      setServerError(err.message);
+    }
   }
 
-  // Moves a banner up (direction -1) or down (direction 1) in the list
-  function moveBanner(index, direction) {
+  // Moves a banner up (direction -1) or down (direction 1) and saves the new order
+  async function moveBanner(index, direction) {
     const newIndex = index + direction;
 
     if (newIndex < 0 || newIndex >= banners.length) {
       return;
     }
 
+    setMessage("");
+    setServerError("");
+
     const copy = banners.slice();
     const movedBanner = copy[index];
     copy[index] = copy[newIndex];
     copy[newIndex] = movedBanner;
+
+    const previousBanners = banners;
     setBanners(copy);
+
+    try {
+      await apiPut(
+        "/banners/reorder",
+        {
+          ids: copy.map(function (item) {
+            return item._id;
+          }),
+        },
+        true
+      );
+    } catch (err) {
+      // Put the old order back if saving failed
+      setBanners(previousBanners);
+      setServerError(err.message);
+    }
   }
 
-  function confirmDelete(id) {
-    const remainingBanners = banners.filter(function (banner) {
-      return banner._id !== id;
-    });
-    setBanners(remainingBanners);
-    setDeleteId("");
-    setMessage("Banner deleted.");
+  async function confirmDelete(id) {
+    setMessage("");
+    setServerError("");
 
-    if (editingId === id) {
-      resetForm();
+    try {
+      await apiDelete("/banners/" + id, true);
+
+      setBanners(
+        banners.filter(function (banner) {
+          return banner._id !== id;
+        })
+      );
+      setMessage("Banner deleted.");
+
+      if (editingId === id) {
+        resetForm();
+      }
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setDeleteId("");
     }
   }
 
@@ -187,11 +260,143 @@ function Banners() {
     submitText = "Save Changes";
   }
 
+  if (saving) {
+    submitText = "Saving...";
+  }
+
+  let listContent = null;
+
+  if (loading) {
+    listContent = <p className="loading-state">Loading banners...</p>;
+  } else if (loadError) {
+    listContent = <p className="alert alert-error">{loadError}</p>;
+  } else if (banners.length === 0) {
+    listContent = <p className="empty-state">No banners yet.</p>;
+  } else {
+    listContent = (
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Order</th>
+            <th>Title</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {banners.map(function (banner, index) {
+            const isDeleting = deleteId === banner._id;
+
+            let statusText = "Draft";
+            let statusClass = "admin-status admin-status-off";
+            if (banner.isPublished) {
+              statusText = "Published";
+              statusClass = "admin-status admin-status-on";
+            }
+
+            return (
+              <tr key={banner._id}>
+                <td>
+                  <div className="admin-row-actions">
+                    <button
+                      type="button"
+                      className="admin-btn"
+                      aria-label={"Move " + banner.title + " up"}
+                      disabled={index === 0}
+                      onClick={function () {
+                        moveBanner(index, -1);
+                      }}
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-btn"
+                      aria-label={"Move " + banner.title + " down"}
+                      disabled={index === banners.length - 1}
+                      onClick={function () {
+                        moveBanner(index, 1);
+                      }}
+                    >
+                      <ArrowDown size={16} />
+                    </button>
+                  </div>
+                </td>
+                <td>{banner.title}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={statusClass}
+                    aria-label={"Toggle published for " + banner.title}
+                    onClick={function () {
+                      togglePublished(banner);
+                    }}
+                  >
+                    {statusText}
+                  </button>
+                </td>
+                <td>
+                  {isDeleting ? (
+                    <div className="admin-confirm">
+                      <span>Delete this banner?</span>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        onClick={function () {
+                          confirmDelete(banner._id);
+                        }}
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        onClick={function () {
+                          setDeleteId("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="admin-row-actions">
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        aria-label={"Edit " + banner.title}
+                        onClick={function () {
+                          startEdit(banner);
+                        }}
+                      >
+                        <Pencil size={16} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        aria-label={"Delete " + banner.title}
+                        onClick={function () {
+                          setDeleteId(banner._id);
+                        }}
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  }
+
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">Homepage Banners</h2>
 
       {message && <div className="alert alert-success">{message}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
 
       {/* Add / edit form */}
       <form className="admin-form" onSubmit={handleSubmit} noValidate>
@@ -288,7 +493,7 @@ function Banners() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-primary" disabled={saving}>
             <Plus size={18} /> {submitText}
           </button>
           {editingId && (
@@ -300,126 +505,7 @@ function Banners() {
       </form>
 
       {/* Banner list */}
-      <div className="admin-table-wrap">
-        {banners.length === 0 ? (
-          <p className="empty-state">No banners yet.</p>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Title</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {banners.map(function (banner, index) {
-                const isDeleting = deleteId === banner._id;
-
-                let statusText = "Draft";
-                let statusClass = "admin-status admin-status-off";
-                if (banner.isPublished) {
-                  statusText = "Published";
-                  statusClass = "admin-status admin-status-on";
-                }
-
-                return (
-                  <tr key={banner._id}>
-                    <td>
-                      <div className="admin-row-actions">
-                        <button
-                          type="button"
-                          className="admin-btn"
-                          aria-label={"Move " + banner.title + " up"}
-                          disabled={index === 0}
-                          onClick={function () {
-                            moveBanner(index, -1);
-                          }}
-                        >
-                          <ArrowUp size={16} />
-                        </button>
-                        <button
-                          type="button"
-                          className="admin-btn"
-                          aria-label={"Move " + banner.title + " down"}
-                          disabled={index === banners.length - 1}
-                          onClick={function () {
-                            moveBanner(index, 1);
-                          }}
-                        >
-                          <ArrowDown size={16} />
-                        </button>
-                      </div>
-                    </td>
-                    <td>{banner.title}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className={statusClass}
-                        aria-label={"Toggle published for " + banner.title}
-                        onClick={function () {
-                          togglePublished(banner._id);
-                        }}
-                      >
-                        {statusText}
-                      </button>
-                    </td>
-                    <td>
-                      {isDeleting ? (
-                        <div className="admin-confirm">
-                          <span>Delete this banner?</span>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            onClick={function () {
-                              confirmDelete(banner._id);
-                            }}
-                          >
-                            Yes, delete
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            onClick={function () {
-                              setDeleteId("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="admin-row-actions">
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            aria-label={"Edit " + banner.title}
-                            onClick={function () {
-                              startEdit(banner);
-                            }}
-                          >
-                            <Pencil size={16} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            aria-label={"Delete " + banner.title}
-                            onClick={function () {
-                              setDeleteId(banner._id);
-                            }}
-                          >
-                            <Trash2 size={16} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <div className="admin-table-wrap">{listContent}</div>
     </div>
   );
 }

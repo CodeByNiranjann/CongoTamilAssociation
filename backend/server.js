@@ -17,6 +17,10 @@ import anthemRoutes from "./routes/anthemRoutes.js";
 import tamilSchoolRoutes from "./routes/tamilSchoolRoutes.js";
 import africaTamilCharalRoutes from "./routes/africaTamilCharalRoutes.js";
 import jobSeekerRoutes from "./routes/jobSeekerRoutes.js";
+import joinEnquiryRoutes from "./routes/joinEnquiryRoutes.js";
+import byLawsRoutes from "./routes/byLawsRoutes.js";
+import contactRoutes from "./routes/contactRoutes.js";
+import visitorRoutes from "./routes/visitorRoutes.js";
 
 
 const app = express();
@@ -80,6 +84,10 @@ app.use("/api/v1/anthem", anthemRoutes);
 app.use("/api/v1/tamil-school", tamilSchoolRoutes);
 app.use("/api/v1/africa-tamil-charal", africaTamilCharalRoutes);
 app.use("/api/v1/job-seekers", jobSeekerRoutes);
+app.use("/api/v1/join-enquiries", joinEnquiryRoutes);
+app.use("/api/v1/by-laws", byLawsRoutes);
+app.use("/api/v1/contact", contactRoutes);
+app.use("/api/v1/visitors", visitorRoutes);
 
 
 // 404 handler and central error handler (must stay last)

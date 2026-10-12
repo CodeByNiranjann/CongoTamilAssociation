@@ -1,27 +1,52 @@
 // src/pages/ByLaws.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { FileText, Download } from "lucide-react";
 
 import SectionTitle from "../components/SectionTitle.jsx";
+import { apiGet } from "../api.js";
 
-// TEMPORARY content. I have not invented any rules or regulations.
-// Replace these with the official CTA By-Laws.
-// Later, all of this comes from the admin "By-Laws" section.
-//
-// Each section looks like: { _id, heading, text }
-// pdfUrl example: "/documents/cta-by-laws.pdf" or a Google Drive link
-const sampleByLaws = {
+const emptyByLaws = {
   intro: "",
   sections: [],
   pdfUrl: "",
 };
 
 function ByLaws() {
-  // Later: replace with data loaded from the backend,
-  // and set loading/error from the request.
-  const [byLaws] = useState(sampleByLaws);
-  const [loading] = useState(false);
-  const [error] = useState("");
+  const [byLaws, setByLaws] = useState(emptyByLaws);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(function loadByLaws() {
+    let isCancelled = false;
+
+    async function fetchByLaws() {
+      try {
+        const result = await apiGet("/by-laws");
+
+        if (isCancelled === false) {
+          setByLaws({
+            intro: result.data.intro || "",
+            sections: result.data.sections || [],
+            pdfUrl: result.data.pdfUrl || "",
+          });
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchByLaws();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (

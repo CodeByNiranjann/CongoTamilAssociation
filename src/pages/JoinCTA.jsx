@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Send, Users } from "lucide-react";
 
 import Notification from "../components/Notification.jsx";
+import { apiPost } from "../api.js";
 
 const emptyForm = {
   name: "",
@@ -46,7 +47,7 @@ function JoinCTAPage() {
     return newErrors;
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setNotice({ type: "info", message: "" });
 
@@ -61,15 +62,24 @@ function JoinCTAPage() {
       return;
     }
 
-    // Backend is not connected yet, so nothing is saved or emailed.
-    // Later: send formData to the join enquiry API here.
     setSubmitting(true);
-    setNotice({
-      type: "info",
-      message:
-        "Form is valid. It is not saved yet because the backend is not connected.",
-    });
-    setSubmitting(false);
+
+    try {
+      const result = await apiPost("/join-enquiries", {
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim(),
+        company: formData.company.trim(),
+      });
+
+      setNotice({ type: "success", message: result.message });
+      setFormData(emptyForm);
+      setErrors({});
+    } catch (err) {
+      setNotice({ type: "error", message: err.message });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   function clearNotice() {
@@ -88,6 +98,11 @@ function JoinCTAPage() {
       return "true";
     }
     return "false";
+  }
+
+  let buttonText = "Submit Enquiry";
+  if (submitting) {
+    buttonText = "Sending...";
   }
 
   return (
@@ -182,7 +197,7 @@ function JoinCTAPage() {
               className="btn btn-primary"
               disabled={submitting}
             >
-              <Send size={18} /> Submit Enquiry
+              <Send size={18} /> {buttonText}
             </button>
           </form>
         </div>

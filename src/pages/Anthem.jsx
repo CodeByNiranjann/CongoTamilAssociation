@@ -1,28 +1,56 @@
 // src/pages/Anthem.jsx
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Play, Pause, Music } from "lucide-react";
 
 import SectionTitle from "../components/SectionTitle.jsx";
+import { apiGet } from "../api.js";
 
-// TEMPORARY content. I have not invented the anthem title, words, or audio.
-// Put the real details here, for example audioUrl: "/audio/anthem.mp3"
-// Later, all of this comes from the admin "CTA Anthem" section.
-const sampleAnthem = {
+const emptyAnthem = {
   title: "CTA Anthem",
   description: "",
   audioUrl: "",
 };
 
 function Anthem() {
-  // Later: replace with data loaded from the backend,
-  // and set loading/error from the request.
-  const [anthem] = useState(sampleAnthem);
-  const [loading] = useState(false);
-  const [error] = useState("");
+  const [anthem, setAnthem] = useState(emptyAnthem);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioError, setAudioError] = useState("");
   const audioRef = useRef(null);
+
+  useEffect(function loadAnthem() {
+    let isCancelled = false;
+
+    async function fetchAnthem() {
+      try {
+        const result = await apiGet("/anthem");
+
+        if (isCancelled === false) {
+          setAnthem({
+            title: result.data.title || "CTA Anthem",
+            description: result.data.description || "",
+            audioUrl: result.data.audioUrl || "",
+          });
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchAnthem();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   function handlePlayPause() {
     const audio = audioRef.current;

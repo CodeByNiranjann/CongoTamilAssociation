@@ -169,3 +169,56 @@ export async function updateStatus(req, res, next) {
 
     res.status(200).json({ success: true, data: application });
   } catch (error) {
+    next(error);
+  }
+}
+
+// GET /api/v1/job-seekers/:id/cv   (admin only)
+// Returns a short-lived download link (valid about 5 minutes).
+// The login is checked by the protect middleware before this runs.
+export async function getCvLink(req, res, next) {
+  try {
+    const application = await JobSeeker.findById(req.params.id).select(
+      "+cvPublicId hasCv cvOriginalName"
+    );
+
+    if (!application || application.hasCv === false || !application.cvPublicId) {
+      return next(createError("No CV found for this application.", 404));
+    }
+
+    const url = getPrivateDownloadUrl(application.cvPublicId, 5);
+
+    res.status(200).json({
+      success: true,
+      url: url,
+      fileName: application.cvOriginalName,
+      expiresInMinutes: 5,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// DELETE /api/v1/job-seekers/:id   (admin only)
+// Removes the application and its stored CV
+export async function deleteApplication(req, res, next) {
+  try {
+    const application = await JobSeeker.findById(req.params.id).select(
+      "+cvPublicId"
+    );
+
+    if (!application) {
+      return next(createError("Application not found.", 404));
+    }
+
+    if (application.cvPublicId) {
+      await deleteFile(application.cvPublicId, "raw", "authenticated");
+    }
+
+    await application.deleteOne();
+
+    res.status(200).json({ success: true, message: "Application deleted." });
+  } catch (error) {
+    next(error);
+  }
+}

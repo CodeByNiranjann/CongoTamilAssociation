@@ -1,51 +1,10 @@
 // src/pages/Festivals.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import SectionTitle from "../components/SectionTitle.jsx";
 import FestivalCard from "../components/FestivalCard.jsx";
 import EventCard from "../components/EventCard.jsx";
-
-// TEMPORARY sample data (generic text, not official CTA content).
-// Each list is replaced by a real API call when the backend is ready.
-const sampleFestivals = [
-  {
-    _id: "f1",
-    title: "Sample upcoming festival",
-    date: "2027-01-14",
-    description: "Real festivals come from the admin dashboard.",
-    imageUrl: "",
-    galleryLink: "",
-  },
-  {
-    _id: "f2",
-    title: "Sample past festival",
-    date: "2026-04-14",
-    description: "This festival has a photo link.",
-    imageUrl: "",
-    galleryLink: "https://drive.google.com",
-  },
-];
-
-const sampleEvents = [
-  {
-    _id: "e1",
-    title: "Sample upcoming event",
-    date: "2027-01-20",
-    location: "Sample location",
-    description: "Real events come from the admin dashboard.",
-    imageUrl: "",
-    galleryLink: "",
-  },
-  {
-    _id: "e2",
-    title: "Sample past event",
-    date: "2026-03-15",
-    location: "Sample location",
-    description: "This event has a gallery link.",
-    imageUrl: "",
-    galleryLink: "https://drive.google.com",
-  },
-];
+import { apiGet } from "../api.js";
 
 // Returns true if the date is today or in the future
 function isUpcoming(dateValue) {
@@ -83,12 +42,42 @@ function sortByDate(items, newestFirst) {
 }
 
 function Festivals() {
-  // Later: replace with data loaded from the backend,
-  // and set loading/error from the request.
-  const [festivals] = useState(sampleFestivals);
-  const [events] = useState(sampleEvents);
-  const [loading] = useState(false);
-  const [error] = useState("");
+  const [festivals, setFestivals] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(function loadFestivalsAndEvents() {
+    let isCancelled = false;
+
+    async function fetchAll() {
+      try {
+        const results = await Promise.all([
+          apiGet("/festivals"),
+          apiGet("/events"),
+        ]);
+
+        if (isCancelled === false) {
+          setFestivals(results[0].data);
+          setEvents(results[1].data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchAll();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   if (loading) {
     return (
