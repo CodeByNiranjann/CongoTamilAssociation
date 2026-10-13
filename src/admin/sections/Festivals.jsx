@@ -1,32 +1,11 @@
 // src/admin/sections/Festivals.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
-// TEMPORARY sample data (generic text, not official CTA content).
-// Add, edit, delete and publish only change this page's memory for now.
-// They are connected to the real backend API later.
-// Image upload: for now you paste an image URL. Later this becomes a file upload to Cloudinary.
-const startingFestivals = [
-  {
-    _id: "f1",
-    title: "Sample upcoming festival",
-    date: "2027-01-14",
-    description: "Sample description.",
-    imageUrl: "",
-    galleryLink: "",
-    isPublished: true,
-  },
-  {
-    _id: "f2",
-    title: "Sample past festival",
-    date: "2026-04-14",
-    description: "",
-    imageUrl: "",
-    galleryLink: "https://drive.google.com",
-    isPublished: false,
-  },
-];
+import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
 
+// Image: for now you paste an image URL. A real file upload to Cloudinary
+// can be added later.
 const emptyForm = {
   title: "",
   date: "",
@@ -36,13 +15,56 @@ const emptyForm = {
   isPublished: true,
 };
 
+// The backend sends dates like "2027-01-14T00:00:00.000Z".
+// The date input and the table only need "2027-01-14".
+function toDateText(dateValue) {
+  if (!dateValue) {
+    return "";
+  }
+  return String(dateValue).slice(0, 10);
+}
+
 function Festivals() {
-  const [festivals, setFestivals] = useState(startingFestivals);
+  const [festivals, setFestivals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
+  const [serverError, setServerError] = useState("");
   const [deleteId, setDeleteId] = useState("");
+
+  // Load all festivals (including drafts) from the backend
+  useEffect(function loadFestivals() {
+    let isCancelled = false;
+
+    async function fetchFestivals() {
+      try {
+        const result = await apiGet("/festivals/admin", true);
+
+        if (isCancelled === false) {
+          setFestivals(result.data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setLoadError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchFestivals();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   function handleChange(event) {
     const fieldName = event.target.name;
@@ -93,9 +115,10 @@ function Festivals() {
     setErrors({});
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setMessage("");
+    setServerError("");
 
     const newErrors = validateForm();
     setErrors(newErrors);
@@ -113,29 +136,41 @@ function Festivals() {
       isPublished: formData.isPublished,
     };
 
-    if (editingId) {
-      const updatedList = festivals.map(function (item) {
-        if (item._id === editingId) {
-          return { ...item, ...cleanData };
-        }
-        return item;
-      });
-      setFestivals(updatedList);
-      setMessage("Festival updated.");
-    } else {
-      const newItem = { _id: "local-" + Date.now(), ...cleanData };
-      setFestivals([newItem, ...festivals]);
-      setMessage("Festival added.");
-    }
+    setSaving(true);
 
-    resetForm();
+    try {
+      if (editingId) {
+        const result = await apiPut("/festivals/" + editingId, cleanData, true);
+
+        setFestivals(
+          festivals.map(function (item) {
+            if (item._id === editingId) {
+              return result.data;
+            }
+            return item;
+          })
+        );
+        setMessage("Festival updated.");
+      } else {
+        const result = await apiPost("/festivals", cleanData, true);
+
+        setFestivals([result.data, ...festivals]);
+        setMessage("Festival added.");
+      }
+
+      resetForm();
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function startEdit(item) {
     setEditingId(item._id);
     setFormData({
       title: item.title,
-      date: item.date,
+      date: toDateText(item.date),
       description: item.description || "",
       imageUrl: item.imageUrl || "",
       galleryLink: item.galleryLink || "",
@@ -143,29 +178,55 @@ function Festivals() {
     });
     setErrors({});
     setMessage("");
+    setServerError("");
     window.scrollTo(0, 0);
   }
 
-  function togglePublished(id) {
-    const updatedList = festivals.map(function (item) {
-      if (item._id === id) {
-        return { ...item, isPublished: !item.isPublished };
-      }
-      return item;
-    });
-    setFestivals(updatedList);
+  async function togglePublished(item) {
+    setMessage("");
+    setServerError("");
+
+    try {
+      const result = await apiPut(
+        "/festivals/" + item._id,
+        { isPublished: !item.isPublished },
+        true
+      );
+
+      setFestivals(
+        festivals.map(function (current) {
+          if (current._id === item._id) {
+            return result.data;
+          }
+          return current;
+        })
+      );
+    } catch (err) {
+      setServerError(err.message);
+    }
   }
 
-  function confirmDelete(id) {
-    const remaining = festivals.filter(function (item) {
-      return item._id !== id;
-    });
-    setFestivals(remaining);
-    setDeleteId("");
-    setMessage("Festival deleted.");
+  async function confirmDelete(id) {
+    setMessage("");
+    setServerError("");
 
-    if (editingId === id) {
-      resetForm();
+    try {
+      await apiDelete("/festivals/" + id, true);
+
+      setFestivals(
+        festivals.filter(function (item) {
+          return item._id !== id;
+        })
+      );
+      setMessage("Festival deleted.");
+
+      if (editingId === id) {
+        resetForm();
+      }
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setDeleteId("");
     }
   }
 
@@ -176,11 +237,118 @@ function Festivals() {
     submitText = "Save Changes";
   }
 
+  if (saving) {
+    submitText = "Saving...";
+  }
+
+  let listContent = null;
+
+  if (loading) {
+    listContent = <p className="loading-state">Loading festivals...</p>;
+  } else if (loadError) {
+    listContent = <p className="alert alert-error">{loadError}</p>;
+  } else if (festivals.length === 0) {
+    listContent = <p className="empty-state">No festivals yet.</p>;
+  } else {
+    listContent = (
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Festival</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {festivals.map(function (item) {
+            const isDeleting = deleteId === item._id;
+
+            let statusText = "Draft";
+            let statusClass = "admin-status admin-status-off";
+            if (item.isPublished) {
+              statusText = "Published";
+              statusClass = "admin-status admin-status-on";
+            }
+
+            return (
+              <tr key={item._id}>
+                <td>{item.title}</td>
+                <td>{toDateText(item.date)}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={statusClass}
+                    aria-label={"Toggle published for " + item.title}
+                    onClick={function () {
+                      togglePublished(item);
+                    }}
+                  >
+                    {statusText}
+                  </button>
+                </td>
+                <td>
+                  {isDeleting ? (
+                    <div className="admin-confirm">
+                      <span>Delete this festival?</span>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        onClick={function () {
+                          confirmDelete(item._id);
+                        }}
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        onClick={function () {
+                          setDeleteId("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="admin-row-actions">
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        aria-label={"Edit " + item.title}
+                        onClick={function () {
+                          startEdit(item);
+                        }}
+                      >
+                        <Pencil size={16} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        aria-label={"Delete " + item.title}
+                        onClick={function () {
+                          setDeleteId(item._id);
+                        }}
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  }
+
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">Festivals</h2>
 
       {message && <div className="alert alert-success">{message}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
 
       {/* Add / edit form */}
       <form className="admin-form" onSubmit={handleSubmit} noValidate>
@@ -277,7 +445,7 @@ function Festivals() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-primary" disabled={saving}>
             <Plus size={18} /> {submitText}
           </button>
           {editingId && (
@@ -289,101 +457,7 @@ function Festivals() {
       </form>
 
       {/* Festival list */}
-      <div className="admin-table-wrap">
-        {festivals.length === 0 ? (
-          <p className="empty-state">No festivals yet.</p>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Festival</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {festivals.map(function (item) {
-                const isDeleting = deleteId === item._id;
-
-                let statusText = "Draft";
-                let statusClass = "admin-status admin-status-off";
-                if (item.isPublished) {
-                  statusText = "Published";
-                  statusClass = "admin-status admin-status-on";
-                }
-
-                return (
-                  <tr key={item._id}>
-                    <td>{item.title}</td>
-                    <td>{item.date}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className={statusClass}
-                        aria-label={"Toggle published for " + item.title}
-                        onClick={function () {
-                          togglePublished(item._id);
-                        }}
-                      >
-                        {statusText}
-                      </button>
-                    </td>
-                    <td>
-                      {isDeleting ? (
-                        <div className="admin-confirm">
-                          <span>Delete this festival?</span>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            onClick={function () {
-                              confirmDelete(item._id);
-                            }}
-                          >
-                            Yes, delete
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            onClick={function () {
-                              setDeleteId("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="admin-row-actions">
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            aria-label={"Edit " + item.title}
-                            onClick={function () {
-                              startEdit(item);
-                            }}
-                          >
-                            <Pencil size={16} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            aria-label={"Delete " + item.title}
-                            onClick={function () {
-                              setDeleteId(item._id);
-                            }}
-                          >
-                            <Trash2 size={16} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <div className="admin-table-wrap">{listContent}</div>
     </div>
   );
 }

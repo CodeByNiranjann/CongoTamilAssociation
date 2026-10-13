@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
 
 import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
+import UploadField from "../UploadField.jsx";
 
 // Image: for now you paste an image URL. A real file upload to Cloudinary
 // can be added later.
