@@ -1,0 +1,7 @@
+.about-photo {
+  width: 100% !important;
+  height: 500px !important;
+  object-fit: contain !important;
+  display: block !important;
+  border-radius: 12px;
+}

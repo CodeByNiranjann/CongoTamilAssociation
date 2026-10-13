@@ -95,3 +95,16 @@ export async function saveTamilSchool(req, res, next) {
     next(error);
   }
 }
+
+
+export async function deleteTamilSchool(req, res, next) {
+  try {
+    await TamilSchool.deleteMany({});
+
+    return res.status(200).json({
+      message: "Tamil School information deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}

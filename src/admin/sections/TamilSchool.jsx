@@ -1,26 +1,13 @@
-// src/admin/sections/TamilSchool.jsx
-import { useState } from "react";
-import { Save, Plus, Trash2, Pencil } from "lucide-react";
 
-// TEMPORARY starting values. I have not invented any school details.
-// Everything here only changes this page's memory for now.
-// It is connected to the real backend API later.
-// Images: for now you paste image URLs. Later this becomes a file upload to Cloudinary.
+import { useState, useEffect } from "react";
+import { Save, Plus, Trash2, Pencil } from "lucide-react";
+import { apiGet, apiPut, apiDelete } from "../../api.js";
+
 const startingSchool = {
   introduction: "",
   activities: [],
   images: [],
 };
-
-const startingAnnouncements = [
-  {
-    _id: "ts1",
-    title: "Sample school announcement",
-    message: "Sample message.",
-    date: "2026-10-10",
-    isPublished: true,
-  },
-];
 
 const emptyAnnouncementForm = {
   title: "",
@@ -29,67 +16,134 @@ const emptyAnnouncementForm = {
   isPublished: true,
 };
 
+function linesToList(text) {
+  return text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+}
+
 function TamilSchool() {
-  // ----- School information -----
+  // School information
   const [savedSchool, setSavedSchool] = useState(startingSchool);
-  const [introduction, setIntroduction] = useState(startingSchool.introduction);
-  const [activitiesText, setActivitiesText] = useState(
-    startingSchool.activities.join("\n")
-  );
-  const [imagesText, setImagesText] = useState(startingSchool.images.join("\n"));
+  const [introduction, setIntroduction] = useState("");
+  const [activitiesText, setActivitiesText] = useState("");
+  const [imagesText, setImagesText] = useState("");
+
+  const [schoolLoading, setSchoolLoading] = useState(true);
+  const [schoolSaving, setSchoolSaving] = useState(false);
   const [schoolErrors, setSchoolErrors] = useState({});
   const [schoolMessage, setSchoolMessage] = useState("");
+  const [schoolServerError, setSchoolServerError] = useState("");
 
-  // ----- Announcements -----
-  const [announcements, setAnnouncements] = useState(startingAnnouncements);
-  const [announcementForm, setAnnouncementForm] = useState(emptyAnnouncementForm);
+  // Announcements: local state, as in your existing file
+  const [announcements, setAnnouncements] = useState([]);
+  const [announcementForm, setAnnouncementForm] =
+    useState(emptyAnnouncementForm);
   const [editingId, setEditingId] = useState("");
   const [announcementErrors, setAnnouncementErrors] = useState({});
   const [announcementMessage, setAnnouncementMessage] = useState("");
   const [deleteId, setDeleteId] = useState("");
 
-  // Turns a textarea (one item per line) into a clean list
-  function linesToList(text) {
-    return text
-      .split("\n")
-      .map(function (line) {
-        return line.trim();
-      })
-      .filter(function (line) {
-        return line !== "";
-      });
-  }
+  // Load school information
+  useEffect(() => {
+    let cancelled = false;
 
-  function handleSchoolSubmit(event) {
+    async function loadSchool() {
+      try {
+        const result = await apiGet("/tamil-school");
+        if (cancelled) return;
+
+        const data = result.data || startingSchool;
+
+        const schoolData = {
+          introduction: data.introduction || "",
+          activities: Array.isArray(data.activities)
+            ? data.activities
+            : [],
+          images: Array.isArray(data.images) ? data.images : [],
+        };
+
+        setSavedSchool(schoolData);
+        setIntroduction(schoolData.introduction);
+        setActivitiesText(schoolData.activities.join("\n"));
+        setImagesText(schoolData.images.join("\n"));
+      } catch (err) {
+        if (!cancelled) {
+          setSchoolServerError(
+            "Could not load school information: " + err.message
+          );
+        }
+      } finally {
+        if (!cancelled) setSchoolLoading(false);
+      }
+    }
+
+    loadSchool();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Save school information to MongoDB
+  async function handleSchoolSubmit(event) {
     event.preventDefault();
+
     setSchoolMessage("");
+    setSchoolServerError("");
 
     const newErrors = {};
 
     if (introduction.length > 3000) {
-      newErrors.introduction = "Information must be 3000 characters or fewer.";
+      newErrors.introduction =
+        "Information must be 3000 characters or fewer.";
     }
 
-    const imageList = linesToList(imagesText);
-    const badImage = imageList.find(function (url) {
-      return /^(https?:\/\/|\/)/.test(url) === false;
-    });
-    if (badImage) {
-      newErrors.images = "Each image must be a full link (https://...) or start with /.";
+    const activities = linesToList(activitiesText);
+    const images = linesToList(imagesText);
+
+    if (activities.some((activity) => activity.length > 300)) {
+      newErrors.activities =
+        "Each activity must be 300 characters or fewer.";
+    }
+
+    if (images.some((url) => !/^(https?:\/\/|\/)/.test(url))) {
+      newErrors.images =
+        "Each image must be a full URL (https://...) or start with /.";
     }
 
     setSchoolErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
-    if (Object.keys(newErrors).length > 0) {
-      return;
-    }
-
-    setSavedSchool({
+    const cleanData = {
       introduction: introduction.trim(),
-      activities: linesToList(activitiesText),
-      images: imageList,
-    });
-    setSchoolMessage("School information saved.");
+      activities,
+      images,
+    };
+
+    setSchoolSaving(true);
+
+    try {
+      const result = await apiPut("/tamil-school", cleanData, true);
+      const data = result.data;
+
+      const updatedSchool = {
+        introduction: data.introduction || "",
+        activities: Array.isArray(data.activities) ? data.activities : [],
+        images: Array.isArray(data.images) ? data.images : [],
+      };
+
+      setSavedSchool(updatedSchool);
+      setIntroduction(updatedSchool.introduction);
+      setActivitiesText(updatedSchool.activities.join("\n"));
+      setImagesText(updatedSchool.images.join("\n"));
+      setSchoolMessage("School information saved successfully.");
+    } catch (err) {
+      setSchoolServerError("Save failed: " + err.message);
+    } finally {
+      setSchoolSaving(false);
+    }
   }
 
   function handleSchoolUndo() {
@@ -98,18 +152,54 @@ function TamilSchool() {
     setImagesText(savedSchool.images.join("\n"));
     setSchoolErrors({});
     setSchoolMessage("");
+    setSchoolServerError("");
   }
 
-  // ----- Announcement handlers -----
-  function handleAnnouncementChange(event) {
-    const fieldName = event.target.name;
-    let fieldValue = event.target.value;
+  // DELETE ALL SCHOOL INFORMATION FROM DATABASE
+  async function handleDeleteAllSchoolInfo() {
+    const confirmed = window.confirm(
+      "Delete all Tamil School information from the database? This cannot be undone."
+    );
 
-    if (event.target.type === "checkbox") {
-      fieldValue = event.target.checked;
+    if (!confirmed) return;
+
+    setSchoolMessage("");
+    setSchoolServerError("");
+    setSchoolSaving(true);
+
+    try {
+      await apiDelete("/tamil-school", true);
+
+      const emptyData = {
+        introduction: "",
+        activities: [],
+        images: [],
+      };
+
+      setSavedSchool(emptyData);
+      setIntroduction("");
+      setActivitiesText("");
+      setImagesText("");
+      setSchoolErrors({});
+
+      setSchoolMessage(
+        "Tamil School information deleted successfully."
+      );
+    } catch (error) {
+      setSchoolServerError("Delete failed: " + error.message);
+    } finally {
+      setSchoolSaving(false);
     }
+  }
 
-    setAnnouncementForm({ ...announcementForm, [fieldName]: fieldValue });
+  // Announcement handlers (local state only)
+  function handleAnnouncementChange(event) {
+    const { name, type, value, checked } = event.target;
+
+    setAnnouncementForm({
+      ...announcementForm,
+      [name]: type === "checkbox" ? checked : value,
+    });
   }
 
   function resetAnnouncementForm() {
@@ -122,29 +212,26 @@ function TamilSchool() {
     event.preventDefault();
     setAnnouncementMessage("");
 
-    const newErrors = {};
+    const errors = {};
 
-    if (announcementForm.title.trim() === "") {
-      newErrors.title = "Title is required.";
+    if (!announcementForm.title.trim()) {
+      errors.title = "Title is required.";
     }
 
     if (announcementForm.title.length > 120) {
-      newErrors.title = "Title must be 120 characters or fewer.";
+      errors.title = "Title must be 120 characters or fewer.";
     }
 
     if (announcementForm.message.length > 1000) {
-      newErrors.message = "Message must be 1000 characters or fewer.";
+      errors.message = "Message must be 1000 characters or fewer.";
     }
 
-    if (announcementForm.date === "") {
-      newErrors.date = "Date is required.";
+    if (!announcementForm.date) {
+      errors.date = "Date is required.";
     }
 
-    setAnnouncementErrors(newErrors);
-
-    if (Object.keys(newErrors).length > 0) {
-      return;
-    }
+    setAnnouncementErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
     const cleanData = {
       title: announcementForm.title.trim(),
@@ -154,19 +241,18 @@ function TamilSchool() {
     };
 
     if (editingId) {
-      setAnnouncements(
-        announcements.map(function (item) {
-          if (item._id === editingId) {
-            return { ...item, ...cleanData };
-          }
-          return item;
-        })
+      setAnnouncements((current) =>
+        current.map((item) =>
+          item._id === editingId ? { ...item, ...cleanData } : item
+        )
       );
-      setAnnouncementMessage("Announcement updated.");
+      setAnnouncementMessage("Announcement updated locally.");
     } else {
-      const newItem = { _id: "local-" + Date.now(), ...cleanData };
-      setAnnouncements([newItem, ...announcements]);
-      setAnnouncementMessage("Announcement added.");
+      setAnnouncements((current) => [
+        { _id: "local-" + Date.now(), ...cleanData },
+        ...current,
+      ]);
+      setAnnouncementMessage("Announcement added locally.");
     }
 
     resetAnnouncementForm();
@@ -185,45 +271,55 @@ function TamilSchool() {
   }
 
   function togglePublished(id) {
-    setAnnouncements(
-      announcements.map(function (item) {
-        if (item._id === id) {
-          return { ...item, isPublished: !item.isPublished };
-        }
-        return item;
-      })
+    setAnnouncements((current) =>
+      current.map((item) =>
+        item._id === id
+          ? { ...item, isPublished: !item.isPublished }
+          : item
+      )
     );
   }
 
   function confirmDelete(id) {
-    setAnnouncements(
-      announcements.filter(function (item) {
-        return item._id !== id;
-      })
+    setAnnouncements((current) =>
+      current.filter((item) => item._id !== id)
     );
+
     setDeleteId("");
-    setAnnouncementMessage("Announcement deleted.");
+    setAnnouncementMessage("Announcement deleted locally.");
 
-    if (editingId === id) {
-      resetAnnouncementForm();
-    }
+    if (editingId === id) resetAnnouncementForm();
   }
 
-  let announcementFormTitle = "Add Announcement";
-  let announcementSubmitText = "Add Announcement";
-  if (editingId) {
-    announcementFormTitle = "Edit Announcement";
-    announcementSubmitText = "Save Changes";
-  }
+  const announcementFormTitle = editingId
+    ? "Edit Announcement"
+    : "Add Announcement";
+
+  const announcementSubmitText = editingId
+    ? "Save Changes"
+    : "Add Announcement";
 
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">Tamil School</h2>
 
-      {/* School information */}
-      {schoolMessage && <div className="alert alert-success">{schoolMessage}</div>}
+      {schoolLoading && (
+        <p className="loading-state">Loading school information...</p>
+      )}
 
-      <form className="admin-form" onSubmit={handleSchoolSubmit} noValidate>
+      {schoolServerError && (
+        <div className="alert alert-error">{schoolServerError}</div>
+      )}
+
+      {schoolMessage && (
+        <div className="alert alert-success">{schoolMessage}</div>
+      )}
+
+      <form
+        className="admin-form"
+        onSubmit={handleSchoolSubmit}
+        noValidate
+      >
         <h3 className="admin-form-title">School Information</h3>
 
         <div className="admin-field">
@@ -232,26 +328,32 @@ function TamilSchool() {
             id="ts-intro"
             rows={5}
             value={introduction}
-            onChange={function (event) {
-              setIntroduction(event.target.value);
-            }}
-            aria-invalid={schoolErrors.introduction ? "true" : "false"}
-          ></textarea>
+            onChange={(event) => setIntroduction(event.target.value)}
+            aria-invalid={Boolean(schoolErrors.introduction)}
+          />
           {schoolErrors.introduction && (
-            <span className="admin-error">{schoolErrors.introduction}</span>
+            <span className="admin-error">
+              {schoolErrors.introduction}
+            </span>
           )}
         </div>
 
         <div className="admin-field">
-          <label htmlFor="ts-activities">Activities (one per line)</label>
+          <label htmlFor="ts-activities">
+            Activities (one per line)
+          </label>
           <textarea
             id="ts-activities"
             rows={4}
             value={activitiesText}
-            onChange={function (event) {
-              setActivitiesText(event.target.value);
-            }}
-          ></textarea>
+            onChange={(event) => setActivitiesText(event.target.value)}
+            aria-invalid={Boolean(schoolErrors.activities)}
+          />
+          {schoolErrors.activities && (
+            <span className="admin-error">
+              {schoolErrors.activities}
+            </span>
+          )}
         </div>
 
         <div className="admin-field">
@@ -261,34 +363,56 @@ function TamilSchool() {
             rows={3}
             placeholder="https://... or /images/school.jpg"
             value={imagesText}
-            onChange={function (event) {
-              setImagesText(event.target.value);
-            }}
-            aria-invalid={schoolErrors.images ? "true" : "false"}
-          ></textarea>
+            onChange={(event) => setImagesText(event.target.value)}
+            aria-invalid={Boolean(schoolErrors.images)}
+          />
           {schoolErrors.images && (
             <span className="admin-error">{schoolErrors.images}</span>
           )}
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
-            <Save size={18} /> Save School Information
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={schoolLoading || schoolSaving}
+          >
+            <Save size={18} />
+            {schoolSaving ? "Saving..." : "Save School Information"}
           </button>
-          <button type="button" className="btn btn-outline" onClick={handleSchoolUndo}>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleSchoolUndo}
+            disabled={schoolLoading || schoolSaving}
+          >
             Undo Changes
+          </button>
+
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleDeleteAllSchoolInfo}
+            disabled={schoolLoading || schoolSaving}
+          >
+            <Trash2 size={18} />
+            Delete All School Information
           </button>
         </div>
       </form>
 
-      {/* Announcements */}
       <h2 className="admin-section-title">School Announcements</h2>
 
       {announcementMessage && (
         <div className="alert alert-success">{announcementMessage}</div>
       )}
 
-      <form className="admin-form" onSubmit={handleAnnouncementSubmit} noValidate>
+      <form
+        className="admin-form"
+        onSubmit={handleAnnouncementSubmit}
+        noValidate
+      >
         <h3 className="admin-form-title">{announcementFormTitle}</h3>
 
         <div className="admin-form-row">
@@ -300,10 +424,12 @@ function TamilSchool() {
               type="text"
               value={announcementForm.title}
               onChange={handleAnnouncementChange}
-              aria-invalid={announcementErrors.title ? "true" : "false"}
+              aria-invalid={Boolean(announcementErrors.title)}
             />
             {announcementErrors.title && (
-              <span className="admin-error">{announcementErrors.title}</span>
+              <span className="admin-error">
+                {announcementErrors.title}
+              </span>
             )}
           </div>
 
@@ -315,10 +441,12 @@ function TamilSchool() {
               type="date"
               value={announcementForm.date}
               onChange={handleAnnouncementChange}
-              aria-invalid={announcementErrors.date ? "true" : "false"}
+              aria-invalid={Boolean(announcementErrors.date)}
             />
             {announcementErrors.date && (
-              <span className="admin-error">{announcementErrors.date}</span>
+              <span className="admin-error">
+                {announcementErrors.date}
+              </span>
             )}
           </div>
         </div>
@@ -331,10 +459,12 @@ function TamilSchool() {
             rows={3}
             value={announcementForm.message}
             onChange={handleAnnouncementChange}
-            aria-invalid={announcementErrors.message ? "true" : "false"}
-          ></textarea>
+            aria-invalid={Boolean(announcementErrors.message)}
+          />
           {announcementErrors.message && (
-            <span className="admin-error">{announcementErrors.message}</span>
+            <span className="admin-error">
+              {announcementErrors.message}
+            </span>
           )}
         </div>
 
@@ -346,13 +476,16 @@ function TamilSchool() {
             checked={announcementForm.isPublished}
             onChange={handleAnnouncementChange}
           />
-          <label htmlFor="tsa-published">Published (visible on the website)</label>
+          <label htmlFor="tsa-published">
+            Published (visible on the website)
+          </label>
         </div>
 
         <div className="admin-form-actions">
           <button type="submit" className="btn btn-primary">
             <Plus size={18} /> {announcementSubmitText}
           </button>
+
           {editingId && (
             <button
               type="button"
@@ -379,15 +512,8 @@ function TamilSchool() {
               </tr>
             </thead>
             <tbody>
-              {announcements.map(function (item) {
+              {announcements.map((item) => {
                 const isDeleting = deleteId === item._id;
-
-                let statusText = "Draft";
-                let statusClass = "admin-status admin-status-off";
-                if (item.isPublished) {
-                  statusText = "Published";
-                  statusClass = "admin-status admin-status-on";
-                }
 
                 return (
                   <tr key={item._id}>
@@ -396,13 +522,14 @@ function TamilSchool() {
                     <td>
                       <button
                         type="button"
-                        className={statusClass}
-                        aria-label={"Toggle published for " + item.title}
-                        onClick={function () {
-                          togglePublished(item._id);
-                        }}
+                        className={
+                          item.isPublished
+                            ? "admin-status admin-status-on"
+                            : "admin-status admin-status-off"
+                        }
+                        onClick={() => togglePublished(item._id)}
                       >
-                        {statusText}
+                        {item.isPublished ? "Published" : "Draft"}
                       </button>
                     </td>
                     <td>
@@ -412,18 +539,14 @@ function TamilSchool() {
                           <button
                             type="button"
                             className="admin-btn admin-btn-danger"
-                            onClick={function () {
-                              confirmDelete(item._id);
-                            }}
+                            onClick={() => confirmDelete(item._id)}
                           >
                             Yes, delete
                           </button>
                           <button
                             type="button"
                             className="admin-btn"
-                            onClick={function () {
-                              setDeleteId("");
-                            }}
+                            onClick={() => setDeleteId("")}
                           >
                             Cancel
                           </button>
@@ -433,20 +556,14 @@ function TamilSchool() {
                           <button
                             type="button"
                             className="admin-btn"
-                            aria-label={"Edit " + item.title}
-                            onClick={function () {
-                              startEdit(item);
-                            }}
+                            onClick={() => startEdit(item)}
                           >
                             <Pencil size={16} /> Edit
                           </button>
                           <button
                             type="button"
                             className="admin-btn admin-btn-danger"
-                            aria-label={"Delete " + item.title}
-                            onClick={function () {
-                              setDeleteId(item._id);
-                            }}
+                            onClick={() => setDeleteId(item._id)}
                           >
                             <Trash2 size={16} /> Delete
                           </button>

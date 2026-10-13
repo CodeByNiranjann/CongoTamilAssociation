@@ -130,12 +130,32 @@
 }
 
 .about-photo {
-  width: 100%;
+  /* width: 100%;
   height: 250px;
   object-fit: cover;
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
+  transition: var(--transition); */
+
+    width: 100%;
+  height: auto;
+  min-height: 500px;
+  max-height: 650px;
+  object-fit: cover;
+  object-position: center;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   transition: var(--transition);
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .about-photo {
+    min-height: 0;
+    height: auto;
+    max-height: none;
+    object-fit: contain;
+  }
 }
 
 .about-photo:hover {
