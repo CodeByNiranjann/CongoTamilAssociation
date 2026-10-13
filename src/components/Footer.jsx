@@ -1,14 +1,9 @@
 // src/components/Footer.jsx
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Video, Mail, Phone, MapPin } from "lucide-react";
 
-// Fill these in only with verified CTA details.
-// Anything left empty is hidden automatically.
-// Later, the contact details will come from the admin "Contact Information" section.
-const youtubeUrl = "";
-const contactEmail = "";
-const contactPhone = "";
-const contactAddress = "";
+import { apiGet } from "../api.js";
 
 const quickLinks = [
   { path: "/about", label: "About CTA" },
@@ -30,11 +25,47 @@ const moreLinks = [
 function Footer() {
   const currentYear = new Date().getFullYear();
 
+  const [contact, setContact] = useState({
+    email: "",
+    phone: "",
+    address: "",
+    youtubeUrl: "",
+  });
+
+  // Real contact details from the backend. If the request fails,
+  // the footer simply shows no contact details.
+  useEffect(function loadContact() {
+    let isCancelled = false;
+
+    async function fetchContact() {
+      try {
+        const result = await apiGet("/contact");
+
+        if (isCancelled === false) {
+          setContact({
+            email: result.data.email || "",
+            phone: result.data.phone || "",
+            address: result.data.address || "",
+            youtubeUrl: result.data.youtubeUrl || "",
+          });
+        }
+      } catch (err) {
+        // Nothing to show
+      }
+    }
+
+    fetchContact();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
+
   let youtubeLink = null;
-  if (youtubeUrl) {
+  if (contact.youtubeUrl) {
     youtubeLink = (
       <a
-        href={youtubeUrl}
+        href={contact.youtubeUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="footer-social"
@@ -47,44 +78,43 @@ function Footer() {
   }
 
   let emailItem = null;
-  if (contactEmail) {
+  if (contact.email) {
     emailItem = (
       <li>
         <Mail size={16} />
-        <a href={"mailto:" + contactEmail}>{contactEmail}</a>
+        <a href={"mailto:" + contact.email}>{contact.email}</a>
       </li>
     );
   }
 
   let phoneItem = null;
-  if (contactPhone) {
+  if (contact.phone) {
     phoneItem = (
       <li>
         <Phone size={16} />
-        <a href={"tel:" + contactPhone}>{contactPhone}</a>
+        <a href={"tel:" + contact.phone}>{contact.phone}</a>
       </li>
     );
   }
 
   let addressItem = null;
-  if (contactAddress) {
+  if (contact.address) {
     addressItem = (
       <li>
         <MapPin size={16} />
-        <span>{contactAddress}</span>
+        <span>{contact.address}</span>
       </li>
     );
   }
 
   let hasContactDetails = false;
-  if (contactEmail || contactPhone || contactAddress) {
+  if (contact.email || contact.phone || contact.address) {
     hasContactDetails = true;
   }
 
   return (
     <footer className="footer">
       <div className="container footer-grid">
-        {/* About column */}
         <div className="footer-column">
           <h3 className="footer-heading">Congo Tamil Association</h3>
           <p className="footer-text">
@@ -94,7 +124,6 @@ function Footer() {
           {youtubeLink}
         </div>
 
-        {/* Quick links column */}
         <div className="footer-column">
           <h3 className="footer-heading">Quick Links</h3>
           <ul className="footer-list">
@@ -108,7 +137,6 @@ function Footer() {
           </ul>
         </div>
 
-        {/* More links column */}
         <div className="footer-column">
           <h3 className="footer-heading">Explore</h3>
           <ul className="footer-list">
@@ -122,7 +150,6 @@ function Footer() {
           </ul>
         </div>
 
-        {/* Contact column */}
         <div className="footer-column">
           <h3 className="footer-heading">Get in Touch</h3>
           <ul className="footer-list footer-contact">

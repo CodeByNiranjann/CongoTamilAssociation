@@ -1,19 +1,15 @@
 // src/admin/sections/ContactInfo.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Save, Plus, Trash2 } from "lucide-react";
 
-// TEMPORARY starting values. I have not invented any contact details.
-// Fill these in only with verified CTA information.
-// Saving only changes this page's memory for now.
-// It is connected to the real backend API later.
-const startingContact = {
+import { apiGet, apiPut } from "../../api.js";
+
+const emptyContact = {
   email: "",
   phone: "",
   address: "",
   youtubeUrl: "",
 };
-
-const startingSocialLinks = [];
 
 const emptySocialForm = {
   name: "",
@@ -21,25 +17,105 @@ const emptySocialForm = {
 };
 
 function ContactInfo() {
-  // ----- Contact details -----
-  const [savedContact, setSavedContact] = useState(startingContact);
-  const [formData, setFormData] = useState(startingContact);
+  const [formData, setFormData] = useState(emptyContact);
+  const [socialLinks, setSocialLinks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
+  const [serverError, setServerError] = useState("");
 
-  // ----- Social media links -----
-  const [socialLinks, setSocialLinks] = useState(startingSocialLinks);
   const [socialForm, setSocialForm] = useState(emptySocialForm);
   const [socialErrors, setSocialErrors] = useState({});
-  const [socialMessage, setSocialMessage] = useState("");
-  const [deleteId, setDeleteId] = useState("");
 
-  // ----- Contact detail handlers -----
+  useEffect(function loadContact() {
+    let isCancelled = false;
+
+    async function fetchContact() {
+      try {
+        const result = await apiGet("/contact");
+
+        if (isCancelled === false) {
+          setFormData({
+            email: result.data.email || "",
+            phone: result.data.phone || "",
+            address: result.data.address || "",
+            youtubeUrl: result.data.youtubeUrl || "",
+          });
+          setSocialLinks(
+            (result.data.socialLinks || []).map(function (item) {
+              return { name: item.name, url: item.url };
+            })
+          );
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setLoadError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchContact();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
+
   function handleChange(event) {
     const fieldName = event.target.name;
     const fieldValue = event.target.value;
 
     setFormData({ ...formData, [fieldName]: fieldValue });
+  }
+
+  function handleSocialChange(event) {
+    const fieldName = event.target.name;
+    const fieldValue = event.target.value;
+
+    setSocialForm({ ...socialForm, [fieldName]: fieldValue });
+  }
+
+  function addSocialLink(event) {
+    event.preventDefault();
+    setMessage("");
+
+    const newErrors = {};
+
+    if (socialForm.name.trim() === "") {
+      newErrors.name = "Name is required, for example Facebook.";
+    }
+
+    const url = socialForm.url.trim();
+    if (url === "") {
+      newErrors.url = "Link is required.";
+    } else if (/^https?:\/\//.test(url) === false) {
+      newErrors.url = "Enter a full link starting with https://";
+    }
+
+    setSocialErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
+
+    setSocialLinks([...socialLinks, { name: socialForm.name.trim(), url: url }]);
+    setSocialForm(emptySocialForm);
+    setMessage("Link added to the list. Click Save Contact Information to keep it.");
+  }
+
+  function removeSocialLink(index) {
+    setSocialLinks(
+      socialLinks.filter(function (item, itemIndex) {
+        return itemIndex !== index;
+      })
+    );
+    setMessage("Link removed from the list. Click Save Contact Information to keep it.");
   }
 
   function validateForm() {
@@ -67,9 +143,10 @@ function ContactInfo() {
     return newErrors;
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setMessage("");
+    setServerError("");
 
     const newErrors = validateForm();
     setErrors(newErrors);
@@ -78,81 +155,48 @@ function ContactInfo() {
       return;
     }
 
-    const cleanData = {
-      email: formData.email.trim(),
-      phone: formData.phone.trim(),
-      address: formData.address.trim(),
-      youtubeUrl: formData.youtubeUrl.trim(),
-    };
+    setSaving(true);
 
-    setSavedContact(cleanData);
-    setFormData(cleanData);
-    setMessage("Contact information saved.");
-  }
-
-  function handleUndo() {
-    setFormData(savedContact);
-    setErrors({});
-    setMessage("");
-  }
-
-  // ----- Social link handlers -----
-  function handleSocialChange(event) {
-    const fieldName = event.target.name;
-    const fieldValue = event.target.value;
-
-    setSocialForm({ ...socialForm, [fieldName]: fieldValue });
-  }
-
-  function handleSocialSubmit(event) {
-    event.preventDefault();
-    setSocialMessage("");
-
-    const newErrors = {};
-
-    if (socialForm.name.trim() === "") {
-      newErrors.name = "Name is required, for example Facebook.";
+    try {
+      await apiPut(
+        "/contact",
+        {
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          address: formData.address.trim(),
+          youtubeUrl: formData.youtubeUrl.trim(),
+          socialLinks: socialLinks,
+        },
+        true
+      );
+      setMessage("Contact information saved.");
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setSaving(false);
     }
-
-    const url = socialForm.url.trim();
-    if (url === "") {
-      newErrors.url = "Link is required.";
-    } else if (/^https?:\/\//.test(url) === false) {
-      newErrors.url = "Enter a full link starting with https://";
-    }
-
-    setSocialErrors(newErrors);
-
-    if (Object.keys(newErrors).length > 0) {
-      return;
-    }
-
-    const newLink = {
-      _id: "local-" + Date.now(),
-      name: socialForm.name.trim(),
-      url: url,
-    };
-
-    setSocialLinks([...socialLinks, newLink]);
-    setSocialForm(emptySocialForm);
-    setSocialMessage("Social link added.");
   }
 
-  function confirmDelete(id) {
-    setSocialLinks(
-      socialLinks.filter(function (item) {
-        return item._id !== id;
-      })
+  if (loading) {
+    return (
+      <div className="admin-section">
+        <p className="loading-state">Loading contact information...</p>
+      </div>
     );
-    setDeleteId("");
-    setSocialMessage("Social link deleted.");
+  }
+
+  let buttonText = "Save Contact Information";
+  if (saving) {
+    buttonText = "Saving...";
   }
 
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">Contact Information</h2>
 
+      {loadError && <div className="alert alert-error">{loadError}</div>}
       {message && <div className="alert alert-success">{message}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
 
       <form className="admin-form" onSubmit={handleSubmit} noValidate>
         <h3 className="admin-form-title">Official Details</h3>
@@ -217,23 +261,15 @@ function ContactInfo() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
-            <Save size={18} /> Save Contact Information
-          </button>
-          <button type="button" className="btn btn-outline" onClick={handleUndo}>
-            Undo Changes
+          <button type="submit" className="btn btn-primary" disabled={saving}>
+            <Save size={18} /> {buttonText}
           </button>
         </div>
       </form>
 
-      {/* Social media links */}
       <h2 className="admin-section-title admin-section-gap">Social Media Links</h2>
 
-      {socialMessage && (
-        <div className="alert alert-success">{socialMessage}</div>
-      )}
-
-      <form className="admin-form" onSubmit={handleSocialSubmit} noValidate>
+      <form className="admin-form" onSubmit={addSocialLink} noValidate>
         <h3 className="admin-form-title">Add Social Link</h3>
 
         <div className="admin-form-row">
@@ -271,7 +307,7 @@ function ContactInfo() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-outline">
             <Plus size={18} /> Add Link
           </button>
         </div>
@@ -290,48 +326,22 @@ function ContactInfo() {
               </tr>
             </thead>
             <tbody>
-              {socialLinks.map(function (item) {
-                const isDeleting = deleteId === item._id;
-
+              {socialLinks.map(function (item, index) {
                 return (
-                  <tr key={item._id}>
+                  <tr key={index}>
                     <td>{item.name}</td>
                     <td>{item.url}</td>
                     <td>
-                      {isDeleting ? (
-                        <div className="admin-confirm">
-                          <span>Delete this link?</span>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            onClick={function () {
-                              confirmDelete(item._id);
-                            }}
-                          >
-                            Yes, delete
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            onClick={function () {
-                              setDeleteId("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          className="admin-btn admin-btn-danger"
-                          aria-label={"Delete " + item.name}
-                          onClick={function () {
-                            setDeleteId(item._id);
-                          }}
-                        >
-                          <Trash2 size={16} /> Delete
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        aria-label={"Remove " + item.name}
+                        onClick={function () {
+                          removeSocialLink(index);
+                        }}
+                      >
+                        <Trash2 size={16} /> Remove
+                      </button>
                     </td>
                   </tr>
                 );

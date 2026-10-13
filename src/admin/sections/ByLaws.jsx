@@ -1,24 +1,9 @@
 // src/admin/sections/ByLaws.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Save, Plus, Trash2, Pencil, ArrowUp, ArrowDown } from "lucide-react";
 
-// TEMPORARY starting values. I have not invented any rules or regulations.
-// Everything here only changes this page's memory for now.
-// It is connected to the real backend API later.
-// PDF: for now you paste a link or a path such as /documents/cta-by-laws.pdf.
-// Later this can become a PDF upload to Cloudinary.
-const startingByLaws = {
-  intro: "",
-  pdfUrl: "",
-};
-
-const startingSections = [
-  {
-    _id: "bl1",
-    heading: "Sample rule heading",
-    text: "Sample rule text.",
-  },
-];
+import { apiGet, apiPut } from "../../api.js";
+import UploadField from "../UploadField.jsx";
 
 const emptySectionForm = {
   heading: "",
@@ -26,55 +11,56 @@ const emptySectionForm = {
 };
 
 function ByLaws() {
-  // ----- Introduction and PDF -----
-  const [savedByLaws, setSavedByLaws] = useState(startingByLaws);
-  const [intro, setIntro] = useState(startingByLaws.intro);
-  const [pdfUrl, setPdfUrl] = useState(startingByLaws.pdfUrl);
+  const [intro, setIntro] = useState("");
+  const [pdfUrl, setPdfUrl] = useState("");
+  const [sections, setSections] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  const [serverError, setServerError] = useState("");
   const [infoErrors, setInfoErrors] = useState({});
-  const [infoMessage, setInfoMessage] = useState("");
 
-  // ----- Rule sections -----
-  const [sections, setSections] = useState(startingSections);
   const [sectionForm, setSectionForm] = useState(emptySectionForm);
-  const [editingId, setEditingId] = useState("");
+  const [editingIndex, setEditingIndex] = useState(-1);
   const [sectionErrors, setSectionErrors] = useState({});
-  const [sectionMessage, setSectionMessage] = useState("");
-  const [deleteId, setDeleteId] = useState("");
+  const [deleteIndex, setDeleteIndex] = useState(-1);
 
-  // ----- Introduction and PDF handlers -----
-  function handleInfoSubmit(event) {
-    event.preventDefault();
-    setInfoMessage("");
+  useEffect(function loadByLaws() {
+    let isCancelled = false;
 
-    const newErrors = {};
+    async function fetchByLaws() {
+      try {
+        const result = await apiGet("/by-laws");
 
-    if (intro.length > 2000) {
-      newErrors.intro = "Introduction must be 2000 characters or fewer.";
+        if (isCancelled === false) {
+          setIntro(result.data.intro || "");
+          setPdfUrl(result.data.pdfUrl || "");
+          setSections(
+            (result.data.sections || []).map(function (item) {
+              return { heading: item.heading, text: item.text };
+            })
+          );
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setLoadError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
     }
 
-    const cleanPdf = pdfUrl.trim();
-    if (cleanPdf !== "" && /^(https?:\/\/|\/)/.test(cleanPdf) === false) {
-      newErrors.pdfUrl = "Enter a full link (https://...) or a path starting with /.";
-    }
+    fetchByLaws();
 
-    setInfoErrors(newErrors);
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
-    if (Object.keys(newErrors).length > 0) {
-      return;
-    }
-
-    setSavedByLaws({ intro: intro.trim(), pdfUrl: cleanPdf });
-    setInfoMessage("By-laws details saved.");
-  }
-
-  function handleInfoUndo() {
-    setIntro(savedByLaws.intro);
-    setPdfUrl(savedByLaws.pdfUrl);
-    setInfoErrors({});
-    setInfoMessage("");
-  }
-
-  // ----- Section handlers -----
   function handleSectionChange(event) {
     const fieldName = event.target.name;
     const fieldValue = event.target.value;
@@ -84,13 +70,14 @@ function ByLaws() {
 
   function resetSectionForm() {
     setSectionForm(emptySectionForm);
-    setEditingId("");
+    setEditingIndex(-1);
     setSectionErrors({});
   }
 
+  // Adds or updates a rule in the list below (saved with the Save button)
   function handleSectionSubmit(event) {
     event.preventDefault();
-    setSectionMessage("");
+    setMessage("");
 
     const newErrors = {};
 
@@ -116,38 +103,37 @@ function ByLaws() {
       return;
     }
 
-    const cleanData = {
+    const cleanItem = {
       heading: sectionForm.heading.trim(),
       text: sectionForm.text.trim(),
     };
 
-    if (editingId) {
+    if (editingIndex >= 0) {
       setSections(
-        sections.map(function (item) {
-          if (item._id === editingId) {
-            return { ...item, ...cleanData };
+        sections.map(function (item, index) {
+          if (index === editingIndex) {
+            return cleanItem;
           }
           return item;
         })
       );
-      setSectionMessage("Rule updated.");
     } else {
-      const newItem = { _id: "local-" + Date.now(), ...cleanData };
-      setSections([...sections, newItem]);
-      setSectionMessage("Rule added.");
+      setSections([...sections, cleanItem]);
     }
 
     resetSectionForm();
+    setMessage("Rule list changed. Click Save By-Laws to keep your changes.");
   }
 
-  function startEdit(item) {
-    setEditingId(item._id);
-    setSectionForm({ heading: item.heading, text: item.text });
+  function startEdit(index) {
+    setEditingIndex(index);
+    setSectionForm({
+      heading: sections[index].heading,
+      text: sections[index].text,
+    });
     setSectionErrors({});
-    setSectionMessage("");
   }
 
-  // Moves a rule up (direction -1) or down (direction 1)
   function moveSection(index, direction) {
     const newIndex = index + direction;
 
@@ -160,37 +146,92 @@ function ByLaws() {
     copy[index] = copy[newIndex];
     copy[newIndex] = moved;
     setSections(copy);
+    setMessage("Rule list changed. Click Save By-Laws to keep your changes.");
   }
 
-  function confirmDelete(id) {
+  function confirmDelete(index) {
     setSections(
-      sections.filter(function (item) {
-        return item._id !== id;
+      sections.filter(function (item, itemIndex) {
+        return itemIndex !== index;
       })
     );
-    setDeleteId("");
-    setSectionMessage("Rule deleted.");
+    setDeleteIndex(-1);
+    resetSectionForm();
+    setMessage("Rule list changed. Click Save By-Laws to keep your changes.");
+  }
 
-    if (editingId === id) {
-      resetSectionForm();
+  async function handleSave() {
+    setMessage("");
+    setServerError("");
+
+    const newErrors = {};
+
+    if (intro.length > 2000) {
+      newErrors.intro = "Introduction must be 2000 characters or fewer.";
     }
+
+    const cleanPdf = pdfUrl.trim();
+    if (cleanPdf !== "" && /^(https?:\/\/|\/)/.test(cleanPdf) === false) {
+      newErrors.pdfUrl = "Enter a full link (https://...) or upload a PDF.";
+    }
+
+    setInfoErrors(newErrors);
+
+    if (Object.keys(newErrors).length > 0) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const result = await apiPut(
+        "/by-laws",
+        { intro: intro.trim(), pdfUrl: cleanPdf, sections: sections },
+        true
+      );
+
+      setSections(
+        result.data.sections.map(function (item) {
+          return { heading: item.heading, text: item.text };
+        })
+      );
+      setMessage("By-laws saved.");
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="admin-section">
+        <p className="loading-state">Loading by-laws...</p>
+      </div>
+    );
   }
 
   let sectionFormTitle = "Add Rule";
   let sectionSubmitText = "Add Rule";
-  if (editingId) {
+  if (editingIndex >= 0) {
     sectionFormTitle = "Edit Rule";
-    sectionSubmitText = "Save Changes";
+    sectionSubmitText = "Update Rule";
+  }
+
+  let saveText = "Save By-Laws";
+  if (saving) {
+    saveText = "Saving...";
   }
 
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">By-Laws</h2>
 
-      {/* Introduction and PDF */}
-      {infoMessage && <div className="alert alert-success">{infoMessage}</div>}
+      {loadError && <div className="alert alert-error">{loadError}</div>}
+      {message && <div className="alert alert-success">{message}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
 
-      <form className="admin-form" onSubmit={handleInfoSubmit} noValidate>
+      <div className="admin-form">
         <h3 className="admin-form-title">Introduction and PDF</h3>
 
         <div className="admin-field">
@@ -209,39 +250,19 @@ function ByLaws() {
           )}
         </div>
 
-        <div className="admin-field">
-          <label htmlFor="bl-pdf">PDF link</label>
-          <input
-            id="bl-pdf"
-            type="text"
-            placeholder="https://... or /documents/cta-by-laws.pdf"
-            value={pdfUrl}
-            onChange={function (event) {
-              setPdfUrl(event.target.value);
-            }}
-            aria-invalid={infoErrors.pdfUrl ? "true" : "false"}
-          />
-          {infoErrors.pdfUrl && (
-            <span className="admin-error">{infoErrors.pdfUrl}</span>
-          )}
-        </div>
+        <UploadField
+          id="bl-pdf"
+          label="By-laws PDF"
+          kind="pdf"
+          value={pdfUrl}
+          onChange={function (url) {
+            setPdfUrl(url);
+          }}
+          error={infoErrors.pdfUrl}
+        />
+      </div>
 
-        <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
-            <Save size={18} /> Save Details
-          </button>
-          <button type="button" className="btn btn-outline" onClick={handleInfoUndo}>
-            Undo Changes
-          </button>
-        </div>
-      </form>
-
-      {/* Rule sections */}
       <h2 className="admin-section-title admin-section-gap">Rules and Regulations</h2>
-
-      {sectionMessage && (
-        <div className="alert alert-success">{sectionMessage}</div>
-      )}
 
       <form className="admin-form" onSubmit={handleSectionSubmit} noValidate>
         <h3 className="admin-form-title">{sectionFormTitle}</h3>
@@ -277,10 +298,10 @@ function ByLaws() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-outline">
             <Plus size={18} /> {sectionSubmitText}
           </button>
-          {editingId && (
+          {editingIndex >= 0 && (
             <button
               type="button"
               className="btn btn-outline"
@@ -306,10 +327,10 @@ function ByLaws() {
             </thead>
             <tbody>
               {sections.map(function (item, index) {
-                const isDeleting = deleteId === item._id;
+                const isDeleting = deleteIndex === index;
 
                 return (
-                  <tr key={item._id}>
+                  <tr key={index}>
                     <td>
                       <div className="admin-row-actions">
                         <button
@@ -345,7 +366,7 @@ function ByLaws() {
                             type="button"
                             className="admin-btn admin-btn-danger"
                             onClick={function () {
-                              confirmDelete(item._id);
+                              confirmDelete(index);
                             }}
                           >
                             Yes, delete
@@ -354,7 +375,7 @@ function ByLaws() {
                             type="button"
                             className="admin-btn"
                             onClick={function () {
-                              setDeleteId("");
+                              setDeleteIndex(-1);
                             }}
                           >
                             Cancel
@@ -367,7 +388,7 @@ function ByLaws() {
                             className="admin-btn"
                             aria-label={"Edit " + item.heading}
                             onClick={function () {
-                              startEdit(item);
+                              startEdit(index);
                             }}
                           >
                             <Pencil size={16} /> Edit
@@ -377,7 +398,7 @@ function ByLaws() {
                             className="admin-btn admin-btn-danger"
                             aria-label={"Delete " + item.heading}
                             onClick={function () {
-                              setDeleteId(item._id);
+                              setDeleteIndex(index);
                             }}
                           >
                             <Trash2 size={16} /> Delete
@@ -391,6 +412,17 @@ function ByLaws() {
             </tbody>
           </table>
         )}
+      </div>
+
+      <div className="admin-form-actions admin-section-gap">
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={saving}
+          onClick={handleSave}
+        >
+          <Save size={18} /> {saveText}
+        </button>
       </div>
     </div>
   );

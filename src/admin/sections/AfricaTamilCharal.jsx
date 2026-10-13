@@ -1,41 +1,9 @@
 // src/admin/sections/AfricaTamilCharal.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Save, Plus, Trash2, Pencil } from "lucide-react";
 
-// TEMPORARY starting values. I have not invented any Africa Tamil Charal details.
-// Everything here only changes this page's memory for now.
-// It is connected to the real backend API later.
-// Images and document links: for now you paste links. Later images become a Cloudinary upload.
-const startingInfo = {
-  introduction: "",
-  images: [],
-};
-
-const startingAnnouncements = [
-  {
-    _id: "atc1",
-    title: "Sample announcement",
-    message: "Sample message.",
-    date: "2026-10-10",
-    isPublished: true,
-  },
-];
-
-const startingDocuments = [
-  {
-    _id: "atd1",
-    title: "Sample document",
-    link: "https://drive.google.com",
-    isPublished: true,
-  },
-];
-
-const emptyAnnouncementForm = {
-  title: "",
-  message: "",
-  date: "",
-  isPublished: true,
-};
+import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
+import UploadField from "../UploadField.jsx";
 
 const emptyDocumentForm = {
   title: "",
@@ -43,45 +11,84 @@ const emptyDocumentForm = {
   isPublished: true,
 };
 
+function linesToList(text) {
+  return text
+    .split("\n")
+    .map(function (line) {
+      return line.trim();
+    })
+    .filter(function (line) {
+      return line !== "";
+    });
+}
+
 function AfricaTamilCharal() {
   // ----- Information -----
-  const [savedInfo, setSavedInfo] = useState(startingInfo);
-  const [introduction, setIntroduction] = useState(startingInfo.introduction);
-  const [imagesText, setImagesText] = useState(startingInfo.images.join("\n"));
+  const [introduction, setIntroduction] = useState("");
+  const [imagesText, setImagesText] = useState("");
+  const [infoLoading, setInfoLoading] = useState(true);
+  const [infoSaving, setInfoSaving] = useState(false);
   const [infoErrors, setInfoErrors] = useState({});
   const [infoMessage, setInfoMessage] = useState("");
 
-  // ----- Announcements -----
-  const [announcements, setAnnouncements] = useState(startingAnnouncements);
-  const [announcementForm, setAnnouncementForm] = useState(emptyAnnouncementForm);
-  const [editingAnnouncementId, setEditingAnnouncementId] = useState("");
-  const [announcementErrors, setAnnouncementErrors] = useState({});
-  const [announcementMessage, setAnnouncementMessage] = useState("");
-  const [deleteAnnouncementId, setDeleteAnnouncementId] = useState("");
-
   // ----- Documents -----
-  const [documents, setDocuments] = useState(startingDocuments);
+  const [documents, setDocuments] = useState([]);
   const [documentForm, setDocumentForm] = useState(emptyDocumentForm);
-  const [editingDocumentId, setEditingDocumentId] = useState("");
+  const [editingId, setEditingId] = useState("");
   const [documentErrors, setDocumentErrors] = useState({});
-  const [documentMessage, setDocumentMessage] = useState("");
-  const [deleteDocumentId, setDeleteDocumentId] = useState("");
+  const [documentSaving, setDocumentSaving] = useState(false);
+  const [deleteId, setDeleteId] = useState("");
 
-  function linesToList(text) {
-    return text
-      .split("\n")
-      .map(function (line) {
-        return line.trim();
-      })
-      .filter(function (line) {
-        return line !== "";
-      });
+  const [loadError, setLoadError] = useState("");
+  const [serverError, setServerError] = useState("");
+  const [documentMessage, setDocumentMessage] = useState("");
+
+  useEffect(function loadAll() {
+    let isCancelled = false;
+
+    async function fetchAll() {
+      try {
+        const results = await Promise.all([
+          apiGet("/africa-tamil-charal"),
+          apiGet("/africa-tamil-charal/documents/admin", true),
+        ]);
+
+        if (isCancelled === false) {
+          setIntroduction(results[0].data.introduction || "");
+          setImagesText((results[0].data.images || []).join("\n"));
+          setDocuments(results[1].data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setLoadError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setInfoLoading(false);
+        }
+      }
+    }
+
+    fetchAll();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
+
+  function addImage(url) {
+    setImagesText(function (previous) {
+      if (previous.trim() === "") {
+        return url;
+      }
+      return previous + "\n" + url;
+    });
   }
 
-  // ----- Information handlers -----
-  function handleInfoSubmit(event) {
+  async function handleInfoSubmit(event) {
     event.preventDefault();
     setInfoMessage("");
+    setServerError("");
 
     const newErrors = {};
 
@@ -103,123 +110,19 @@ function AfricaTamilCharal() {
       return;
     }
 
-    setSavedInfo({ introduction: introduction.trim(), images: imageList });
-    setInfoMessage("Information saved.");
-  }
+    setInfoSaving(true);
 
-  function handleInfoUndo() {
-    setIntroduction(savedInfo.introduction);
-    setImagesText(savedInfo.images.join("\n"));
-    setInfoErrors({});
-    setInfoMessage("");
-  }
-
-  // ----- Announcement handlers -----
-  function handleAnnouncementChange(event) {
-    const fieldName = event.target.name;
-    let fieldValue = event.target.value;
-
-    if (event.target.type === "checkbox") {
-      fieldValue = event.target.checked;
-    }
-
-    setAnnouncementForm({ ...announcementForm, [fieldName]: fieldValue });
-  }
-
-  function resetAnnouncementForm() {
-    setAnnouncementForm(emptyAnnouncementForm);
-    setEditingAnnouncementId("");
-    setAnnouncementErrors({});
-  }
-
-  function handleAnnouncementSubmit(event) {
-    event.preventDefault();
-    setAnnouncementMessage("");
-
-    const newErrors = {};
-
-    if (announcementForm.title.trim() === "") {
-      newErrors.title = "Title is required.";
-    }
-
-    if (announcementForm.title.length > 120) {
-      newErrors.title = "Title must be 120 characters or fewer.";
-    }
-
-    if (announcementForm.message.length > 1000) {
-      newErrors.message = "Message must be 1000 characters or fewer.";
-    }
-
-    if (announcementForm.date === "") {
-      newErrors.date = "Date is required.";
-    }
-
-    setAnnouncementErrors(newErrors);
-
-    if (Object.keys(newErrors).length > 0) {
-      return;
-    }
-
-    const cleanData = {
-      title: announcementForm.title.trim(),
-      message: announcementForm.message.trim(),
-      date: announcementForm.date,
-      isPublished: announcementForm.isPublished,
-    };
-
-    if (editingAnnouncementId) {
-      setAnnouncements(
-        announcements.map(function (item) {
-          if (item._id === editingAnnouncementId) {
-            return { ...item, ...cleanData };
-          }
-          return item;
-        })
+    try {
+      await apiPut(
+        "/africa-tamil-charal",
+        { introduction: introduction.trim(), images: imageList },
+        true
       );
-      setAnnouncementMessage("Announcement updated.");
-    } else {
-      const newItem = { _id: "local-" + Date.now(), ...cleanData };
-      setAnnouncements([newItem, ...announcements]);
-      setAnnouncementMessage("Announcement added.");
-    }
-
-    resetAnnouncementForm();
-  }
-
-  function startEditAnnouncement(item) {
-    setEditingAnnouncementId(item._id);
-    setAnnouncementForm({
-      title: item.title,
-      message: item.message || "",
-      date: item.date,
-      isPublished: item.isPublished,
-    });
-    setAnnouncementErrors({});
-    setAnnouncementMessage("");
-  }
-
-  function toggleAnnouncementPublished(id) {
-    setAnnouncements(
-      announcements.map(function (item) {
-        if (item._id === id) {
-          return { ...item, isPublished: !item.isPublished };
-        }
-        return item;
-      })
-    );
-  }
-
-  function confirmDeleteAnnouncement(id) {
-    setAnnouncements(
-      announcements.filter(function (item) {
-        return item._id !== id;
-      })
-    );
-    setDeleteAnnouncementId("");
-    setAnnouncementMessage("Announcement deleted.");
-
-    if (editingAnnouncementId === id) {
-      resetAnnouncementForm();
+      setInfoMessage("Information saved.");
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setInfoSaving(false);
     }
   }
 
@@ -237,13 +140,14 @@ function AfricaTamilCharal() {
 
   function resetDocumentForm() {
     setDocumentForm(emptyDocumentForm);
-    setEditingDocumentId("");
+    setEditingId("");
     setDocumentErrors({});
   }
 
-  function handleDocumentSubmit(event) {
+  async function handleDocumentSubmit(event) {
     event.preventDefault();
     setDocumentMessage("");
+    setServerError("");
 
     const newErrors = {};
 
@@ -257,7 +161,7 @@ function AfricaTamilCharal() {
 
     const link = documentForm.link.trim();
     if (link === "") {
-      newErrors.link = "A PDF or Google Drive link is required.";
+      newErrors.link = "Upload a PDF or enter a link.";
     } else if (/^https?:\/\//.test(link) === false) {
       newErrors.link = "Enter a full link starting with https://";
     }
@@ -274,27 +178,44 @@ function AfricaTamilCharal() {
       isPublished: documentForm.isPublished,
     };
 
-    if (editingDocumentId) {
-      setDocuments(
-        documents.map(function (item) {
-          if (item._id === editingDocumentId) {
-            return { ...item, ...cleanData };
-          }
-          return item;
-        })
-      );
-      setDocumentMessage("Document updated.");
-    } else {
-      const newItem = { _id: "local-" + Date.now(), ...cleanData };
-      setDocuments([newItem, ...documents]);
-      setDocumentMessage("Document added.");
-    }
+    setDocumentSaving(true);
 
-    resetDocumentForm();
+    try {
+      if (editingId) {
+        const result = await apiPut(
+          "/africa-tamil-charal/documents/" + editingId,
+          cleanData,
+          true
+        );
+        setDocuments(
+          documents.map(function (item) {
+            if (item._id === editingId) {
+              return result.data;
+            }
+            return item;
+          })
+        );
+        setDocumentMessage("Document updated.");
+      } else {
+        const result = await apiPost(
+          "/africa-tamil-charal/documents",
+          cleanData,
+          true
+        );
+        setDocuments([result.data, ...documents]);
+        setDocumentMessage("Document added.");
+      }
+
+      resetDocumentForm();
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setDocumentSaving(false);
+    }
   }
 
-  function startEditDocument(item) {
-    setEditingDocumentId(item._id);
+  function startEdit(item) {
+    setEditingId(item._id);
     setDocumentForm({
       title: item.title,
       link: item.link,
@@ -304,50 +225,81 @@ function AfricaTamilCharal() {
     setDocumentMessage("");
   }
 
-  function toggleDocumentPublished(id) {
-    setDocuments(
-      documents.map(function (item) {
-        if (item._id === id) {
-          return { ...item, isPublished: !item.isPublished };
-        }
-        return item;
-      })
-    );
-  }
+  async function togglePublished(item) {
+    setDocumentMessage("");
+    setServerError("");
 
-  function confirmDeleteDocument(id) {
-    setDocuments(
-      documents.filter(function (item) {
-        return item._id !== id;
-      })
-    );
-    setDeleteDocumentId("");
-    setDocumentMessage("Document deleted.");
-
-    if (editingDocumentId === id) {
-      resetDocumentForm();
+    try {
+      const result = await apiPut(
+        "/africa-tamil-charal/documents/" + item._id,
+        { isPublished: !item.isPublished },
+        true
+      );
+      setDocuments(
+        documents.map(function (current) {
+          if (current._id === item._id) {
+            return result.data;
+          }
+          return current;
+        })
+      );
+    } catch (err) {
+      setServerError(err.message);
     }
   }
 
-  let announcementFormTitle = "Add Announcement";
-  let announcementSubmitText = "Add Announcement";
-  if (editingAnnouncementId) {
-    announcementFormTitle = "Edit Announcement";
-    announcementSubmitText = "Save Changes";
+  async function confirmDelete(id) {
+    setDocumentMessage("");
+    setServerError("");
+
+    try {
+      await apiDelete("/africa-tamil-charal/documents/" + id, true);
+      setDocuments(
+        documents.filter(function (item) {
+          return item._id !== id;
+        })
+      );
+      setDocumentMessage("Document deleted.");
+
+      if (editingId === id) {
+        resetDocumentForm();
+      }
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setDeleteId("");
+    }
+  }
+
+  if (infoLoading) {
+    return (
+      <div className="admin-section">
+        <p className="loading-state">Loading Africa Tamil Charal...</p>
+      </div>
+    );
+  }
+
+  let infoButtonText = "Save Information";
+  if (infoSaving) {
+    infoButtonText = "Saving...";
   }
 
   let documentFormTitle = "Add Document";
   let documentSubmitText = "Add Document";
-  if (editingDocumentId) {
+  if (editingId) {
     documentFormTitle = "Edit Document";
     documentSubmitText = "Save Changes";
+  }
+  if (documentSaving) {
+    documentSubmitText = "Saving...";
   }
 
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">Africa Tamil Charal</h2>
 
-      {/* Information */}
+      {loadError && <div className="alert alert-error">{loadError}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
       {infoMessage && <div className="alert alert-success">{infoMessage}</div>}
 
       <form className="admin-form" onSubmit={handleInfoSubmit} noValidate>
@@ -374,7 +326,6 @@ function AfricaTamilCharal() {
           <textarea
             id="atc-images"
             rows={3}
-            placeholder="https://... or /images/photo.jpg"
             value={imagesText}
             onChange={function (event) {
               setImagesText(event.target.value);
@@ -386,197 +337,26 @@ function AfricaTamilCharal() {
           )}
         </div>
 
+        <UploadField
+          id="atc-upload"
+          label="Upload a photo (adds it to the list above)"
+          kind="image"
+          showLink={false}
+          onChange={addImage}
+        />
+
+        <p className="admin-hint">
+          Announcements are managed in the Announcements page, and publications
+          in the Publications page.
+        </p>
+
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
-            <Save size={18} /> Save Information
-          </button>
-          <button type="button" className="btn btn-outline" onClick={handleInfoUndo}>
-            Undo Changes
+          <button type="submit" className="btn btn-primary" disabled={infoSaving}>
+            <Save size={18} /> {infoButtonText}
           </button>
         </div>
       </form>
 
-      {/* Announcements */}
-      <h2 className="admin-section-title">Announcements</h2>
-
-      {announcementMessage && (
-        <div className="alert alert-success">{announcementMessage}</div>
-      )}
-
-      <form className="admin-form" onSubmit={handleAnnouncementSubmit} noValidate>
-        <h3 className="admin-form-title">{announcementFormTitle}</h3>
-
-        <div className="admin-form-row">
-          <div className="admin-field">
-            <label htmlFor="atca-title">Title *</label>
-            <input
-              id="atca-title"
-              name="title"
-              type="text"
-              value={announcementForm.title}
-              onChange={handleAnnouncementChange}
-              aria-invalid={announcementErrors.title ? "true" : "false"}
-            />
-            {announcementErrors.title && (
-              <span className="admin-error">{announcementErrors.title}</span>
-            )}
-          </div>
-
-          <div className="admin-field">
-            <label htmlFor="atca-date">Date *</label>
-            <input
-              id="atca-date"
-              name="date"
-              type="date"
-              value={announcementForm.date}
-              onChange={handleAnnouncementChange}
-              aria-invalid={announcementErrors.date ? "true" : "false"}
-            />
-            {announcementErrors.date && (
-              <span className="admin-error">{announcementErrors.date}</span>
-            )}
-          </div>
-        </div>
-
-        <div className="admin-field">
-          <label htmlFor="atca-message">Message (optional)</label>
-          <textarea
-            id="atca-message"
-            name="message"
-            rows={3}
-            value={announcementForm.message}
-            onChange={handleAnnouncementChange}
-            aria-invalid={announcementErrors.message ? "true" : "false"}
-          ></textarea>
-          {announcementErrors.message && (
-            <span className="admin-error">{announcementErrors.message}</span>
-          )}
-        </div>
-
-        <div className="admin-check">
-          <input
-            id="atca-published"
-            name="isPublished"
-            type="checkbox"
-            checked={announcementForm.isPublished}
-            onChange={handleAnnouncementChange}
-          />
-          <label htmlFor="atca-published">Published (visible on the website)</label>
-        </div>
-
-        <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
-            <Plus size={18} /> {announcementSubmitText}
-          </button>
-          {editingAnnouncementId && (
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={resetAnnouncementForm}
-            >
-              Cancel
-            </button>
-          )}
-        </div>
-      </form>
-
-      <div className="admin-table-wrap">
-        {announcements.length === 0 ? (
-          <p className="empty-state">No announcements yet.</p>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Title</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {announcements.map(function (item) {
-                const isDeleting = deleteAnnouncementId === item._id;
-
-                let statusText = "Draft";
-                let statusClass = "admin-status admin-status-off";
-                if (item.isPublished) {
-                  statusText = "Published";
-                  statusClass = "admin-status admin-status-on";
-                }
-
-                return (
-                  <tr key={item._id}>
-                    <td>{item.title}</td>
-                    <td>{item.date}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className={statusClass}
-                        aria-label={"Toggle published for " + item.title}
-                        onClick={function () {
-                          toggleAnnouncementPublished(item._id);
-                        }}
-                      >
-                        {statusText}
-                      </button>
-                    </td>
-                    <td>
-                      {isDeleting ? (
-                        <div className="admin-confirm">
-                          <span>Delete this announcement?</span>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            onClick={function () {
-                              confirmDeleteAnnouncement(item._id);
-                            }}
-                          >
-                            Yes, delete
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            onClick={function () {
-                              setDeleteAnnouncementId("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="admin-row-actions">
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            aria-label={"Edit " + item.title}
-                            onClick={function () {
-                              startEditAnnouncement(item);
-                            }}
-                          >
-                            <Pencil size={16} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            aria-label={"Delete " + item.title}
-                            onClick={function () {
-                              setDeleteAnnouncementId(item._id);
-                            }}
-                          >
-                            <Trash2 size={16} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {/* Documents */}
       <h2 className="admin-section-title admin-section-gap">Documents</h2>
 
       {documentMessage && (
@@ -586,38 +366,31 @@ function AfricaTamilCharal() {
       <form className="admin-form" onSubmit={handleDocumentSubmit} noValidate>
         <h3 className="admin-form-title">{documentFormTitle}</h3>
 
-        <div className="admin-form-row">
-          <div className="admin-field">
-            <label htmlFor="atcd-title">Title *</label>
-            <input
-              id="atcd-title"
-              name="title"
-              type="text"
-              value={documentForm.title}
-              onChange={handleDocumentChange}
-              aria-invalid={documentErrors.title ? "true" : "false"}
-            />
-            {documentErrors.title && (
-              <span className="admin-error">{documentErrors.title}</span>
-            )}
-          </div>
-
-          <div className="admin-field">
-            <label htmlFor="atcd-link">PDF / Google Drive link *</label>
-            <input
-              id="atcd-link"
-              name="link"
-              type="text"
-              placeholder="https://drive.google.com/..."
-              value={documentForm.link}
-              onChange={handleDocumentChange}
-              aria-invalid={documentErrors.link ? "true" : "false"}
-            />
-            {documentErrors.link && (
-              <span className="admin-error">{documentErrors.link}</span>
-            )}
-          </div>
+        <div className="admin-field">
+          <label htmlFor="atcd-title">Title *</label>
+          <input
+            id="atcd-title"
+            name="title"
+            type="text"
+            value={documentForm.title}
+            onChange={handleDocumentChange}
+            aria-invalid={documentErrors.title ? "true" : "false"}
+          />
+          {documentErrors.title && (
+            <span className="admin-error">{documentErrors.title}</span>
+          )}
         </div>
+
+        <UploadField
+          id="atcd-link"
+          label="PDF file or Google Drive link *"
+          kind="pdf"
+          value={documentForm.link}
+          onChange={function (url) {
+            setDocumentForm({ ...documentForm, link: url });
+          }}
+          error={documentErrors.link}
+        />
 
         <div className="admin-check">
           <input
@@ -631,10 +404,10 @@ function AfricaTamilCharal() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-primary" disabled={documentSaving}>
             <Plus size={18} /> {documentSubmitText}
           </button>
-          {editingDocumentId && (
+          {editingId && (
             <button
               type="button"
               className="btn btn-outline"
@@ -660,7 +433,7 @@ function AfricaTamilCharal() {
             </thead>
             <tbody>
               {documents.map(function (item) {
-                const isDeleting = deleteDocumentId === item._id;
+                const isDeleting = deleteId === item._id;
 
                 let statusText = "Draft";
                 let statusClass = "admin-status admin-status-off";
@@ -678,7 +451,7 @@ function AfricaTamilCharal() {
                         className={statusClass}
                         aria-label={"Toggle published for " + item.title}
                         onClick={function () {
-                          toggleDocumentPublished(item._id);
+                          togglePublished(item);
                         }}
                       >
                         {statusText}
@@ -692,7 +465,7 @@ function AfricaTamilCharal() {
                             type="button"
                             className="admin-btn admin-btn-danger"
                             onClick={function () {
-                              confirmDeleteDocument(item._id);
+                              confirmDelete(item._id);
                             }}
                           >
                             Yes, delete
@@ -701,7 +474,7 @@ function AfricaTamilCharal() {
                             type="button"
                             className="admin-btn"
                             onClick={function () {
-                              setDeleteDocumentId("");
+                              setDeleteId("");
                             }}
                           >
                             Cancel
@@ -714,7 +487,7 @@ function AfricaTamilCharal() {
                             className="admin-btn"
                             aria-label={"Edit " + item.title}
                             onClick={function () {
-                              startEditDocument(item);
+                              startEdit(item);
                             }}
                           >
                             <Pencil size={16} /> Edit
@@ -724,7 +497,7 @@ function AfricaTamilCharal() {
                             className="admin-btn admin-btn-danger"
                             aria-label={"Delete " + item.title}
                             onClick={function () {
-                              setDeleteDocumentId(item._id);
+                              setDeleteId(item._id);
                             }}
                           >
                             <Trash2 size={16} /> Delete

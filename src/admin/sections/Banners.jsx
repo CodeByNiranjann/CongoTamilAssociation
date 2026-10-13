@@ -1,12 +1,522 @@
-// src/admin/sections/Banners.jsx
+// // src/admin/sections/Banners.jsx
+// import { useState, useEffect } from "react";
+// import { Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
+
+// import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
+// import UploadField from "../UploadField.jsx";
+
+// // Image: for now you paste an image URL. A real file upload to Cloudinary
+// // can be added later.
+// const emptyForm = {
+//   title: "",
+//   description: "",
+//   imageUrl: "",
+//   buttonText: "",
+//   buttonLink: "",
+//   isPublished: true,
+// };
+
+// function Banners() {
+//   const [banners, setBanners] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [loadError, setLoadError] = useState("");
+//   const [saving, setSaving] = useState(false);
+
+//   const [formData, setFormData] = useState(emptyForm);
+//   const [editingId, setEditingId] = useState("");
+//   const [errors, setErrors] = useState({});
+//   const [message, setMessage] = useState("");
+//   const [serverError, setServerError] = useState("");
+//   const [deleteId, setDeleteId] = useState("");
+
+//   // Load all banners (including drafts) from the backend
+//   useEffect(function loadBanners() {
+//     let isCancelled = false;
+
+//     async function fetchBanners() {
+//       try {
+//         const result = await apiGet("/banners/admin", true);
+
+//         if (isCancelled === false) {
+//           setBanners(result.data);
+//         }
+//       } catch (err) {
+//         if (isCancelled === false) {
+//           setLoadError(err.message);
+//         }
+//       } finally {
+//         if (isCancelled === false) {
+//           setLoading(false);
+//         }
+//       }
+//     }
+
+//     fetchBanners();
+
+//     return function cleanup() {
+//       isCancelled = true;
+//     };
+//   }, []);
+
+//   function handleChange(event) {
+//     const fieldName = event.target.name;
+//     let fieldValue = event.target.value;
+
+//     if (event.target.type === "checkbox") {
+//       fieldValue = event.target.checked;
+//     }
+
+//     setFormData({ ...formData, [fieldName]: fieldValue });
+//   }
+
+//   function validateForm() {
+//     const newErrors = {};
+
+//     if (formData.title.trim() === "") {
+//       newErrors.title = "Title is required.";
+//     }
+
+//     if (formData.description.length > 300) {
+//       newErrors.description = "Description must be 300 characters or fewer.";
+//     }
+
+//     const imageUrl = formData.imageUrl.trim();
+//     if (imageUrl !== "" && /^(https?:\/\/|\/)/.test(imageUrl) === false) {
+//       newErrors.imageUrl = "Enter a full link (https://...) or a path starting with /.";
+//     }
+
+//     const hasText = formData.buttonText.trim() !== "";
+//     const hasLink = formData.buttonLink.trim() !== "";
+//     if (hasText && hasLink === false) {
+//       newErrors.buttonLink = "Add a button link, or clear the button text.";
+//     }
+//     if (hasLink && hasText === false) {
+//       newErrors.buttonText = "Add button text, or clear the button link.";
+//     }
+
+//     return newErrors;
+//   }
+
+//   function resetForm() {
+//     setFormData(emptyForm);
+//     setEditingId("");
+//     setErrors({});
+//   }
+
+//   async function handleSubmit(event) {
+//     event.preventDefault();
+//     setMessage("");
+//     setServerError("");
+
+//     const newErrors = validateForm();
+//     setErrors(newErrors);
+
+//     if (Object.keys(newErrors).length > 0) {
+//       return;
+//     }
+
+//     const cleanData = {
+//       title: formData.title.trim(),
+//       description: formData.description.trim(),
+//       imageUrl: formData.imageUrl.trim(),
+//       buttonText: formData.buttonText.trim(),
+//       buttonLink: formData.buttonLink.trim(),
+//       isPublished: formData.isPublished,
+//     };
+
+//     setSaving(true);
+
+//     try {
+//       if (editingId) {
+//         const result = await apiPut("/banners/" + editingId, cleanData, true);
+
+//         setBanners(
+//           banners.map(function (banner) {
+//             if (banner._id === editingId) {
+//               return result.data;
+//             }
+//             return banner;
+//           })
+//         );
+//         setMessage("Banner updated.");
+//       } else {
+//         const result = await apiPost("/banners", cleanData, true);
+
+//         setBanners([...banners, result.data]);
+//         setMessage("Banner added.");
+//       }
+
+//       resetForm();
+//     } catch (err) {
+//       setServerError(err.message);
+//     } finally {
+//       setSaving(false);
+//     }
+//   }
+
+//   function startEdit(banner) {
+//     setEditingId(banner._id);
+//     setFormData({
+//       title: banner.title,
+//       description: banner.description || "",
+//       imageUrl: banner.imageUrl || "",
+//       buttonText: banner.buttonText || "",
+//       buttonLink: banner.buttonLink || "",
+//       isPublished: banner.isPublished,
+//     });
+//     setErrors({});
+//     setMessage("");
+//     setServerError("");
+//     window.scrollTo(0, 0);
+//   }
+
+//   async function togglePublished(banner) {
+//     setMessage("");
+//     setServerError("");
+
+//     try {
+//       const result = await apiPut(
+//         "/banners/" + banner._id,
+//         { isPublished: !banner.isPublished },
+//         true
+//       );
+
+//       setBanners(
+//         banners.map(function (item) {
+//           if (item._id === banner._id) {
+//             return result.data;
+//           }
+//           return item;
+//         })
+//       );
+//     } catch (err) {
+//       setServerError(err.message);
+//     }
+//   }
+
+//   // Moves a banner up (direction -1) or down (direction 1) and saves the new order
+//   async function moveBanner(index, direction) {
+//     const newIndex = index + direction;
+
+//     if (newIndex < 0 || newIndex >= banners.length) {
+//       return;
+//     }
+
+//     setMessage("");
+//     setServerError("");
+
+//     const copy = banners.slice();
+//     const movedBanner = copy[index];
+//     copy[index] = copy[newIndex];
+//     copy[newIndex] = movedBanner;
+
+//     const previousBanners = banners;
+//     setBanners(copy);
+
+//     try {
+//       await apiPut(
+//         "/banners/reorder",
+//         {
+//           ids: copy.map(function (item) {
+//             return item._id;
+//           }),
+//         },
+//         true
+//       );
+//     } catch (err) {
+//       // Put the old order back if saving failed
+//       setBanners(previousBanners);
+//       setServerError(err.message);
+//     }
+//   }
+
+//   async function confirmDelete(id) {
+//     setMessage("");
+//     setServerError("");
+
+//     try {
+//       await apiDelete("/banners/" + id, true);
+
+//       setBanners(
+//         banners.filter(function (banner) {
+//           return banner._id !== id;
+//         })
+//       );
+//       setMessage("Banner deleted.");
+
+//       if (editingId === id) {
+//         resetForm();
+//       }
+//     } catch (err) {
+//       setServerError(err.message);
+//     } finally {
+//       setDeleteId("");
+//     }
+//   }
+
+//   let formTitle = "Add Banner";
+//   let submitText = "Add Banner";
+//   if (editingId) {
+//     formTitle = "Edit Banner";
+//     submitText = "Save Changes";
+//   }
+
+//   if (saving) {
+//     submitText = "Saving...";
+//   }
+
+//   let listContent = null;
+
+//   if (loading) {
+//     listContent = <p className="loading-state">Loading banners...</p>;
+//   } else if (loadError) {
+//     listContent = <p className="alert alert-error">{loadError}</p>;
+//   } else if (banners.length === 0) {
+//     listContent = <p className="empty-state">No banners yet.</p>;
+//   } else {
+//     listContent = (
+//       <table className="admin-table">
+//         <thead>
+//           <tr>
+//             <th>Order</th>
+//             <th>Title</th>
+//             <th>Status</th>
+//             <th>Actions</th>
+//           </tr>
+//         </thead>
+//         <tbody>
+//           {banners.map(function (banner, index) {
+//             const isDeleting = deleteId === banner._id;
+
+//             let statusText = "Draft";
+//             let statusClass = "admin-status admin-status-off";
+//             if (banner.isPublished) {
+//               statusText = "Published";
+//               statusClass = "admin-status admin-status-on";
+//             }
+
+//             return (
+//               <tr key={banner._id}>
+//                 <td>
+//                   <div className="admin-row-actions">
+//                     <button
+//                       type="button"
+//                       className="admin-btn"
+//                       aria-label={"Move " + banner.title + " up"}
+//                       disabled={index === 0}
+//                       onClick={function () {
+//                         moveBanner(index, -1);
+//                       }}
+//                     >
+//                       <ArrowUp size={16} />
+//                     </button>
+//                     <button
+//                       type="button"
+//                       className="admin-btn"
+//                       aria-label={"Move " + banner.title + " down"}
+//                       disabled={index === banners.length - 1}
+//                       onClick={function () {
+//                         moveBanner(index, 1);
+//                       }}
+//                     >
+//                       <ArrowDown size={16} />
+//                     </button>
+//                   </div>
+//                 </td>
+//                 <td>{banner.title}</td>
+//                 <td>
+//                   <button
+//                     type="button"
+//                     className={statusClass}
+//                     aria-label={"Toggle published for " + banner.title}
+//                     onClick={function () {
+//                       togglePublished(banner);
+//                     }}
+//                   >
+//                     {statusText}
+//                   </button>
+//                 </td>
+//                 <td>
+//                   {isDeleting ? (
+//                     <div className="admin-confirm">
+//                       <span>Delete this banner?</span>
+//                       <button
+//                         type="button"
+//                         className="admin-btn admin-btn-danger"
+//                         onClick={function () {
+//                           confirmDelete(banner._id);
+//                         }}
+//                       >
+//                         Yes, delete
+//                       </button>
+//                       <button
+//                         type="button"
+//                         className="admin-btn"
+//                         onClick={function () {
+//                           setDeleteId("");
+//                         }}
+//                       >
+//                         Cancel
+//                       </button>
+//                     </div>
+//                   ) : (
+//                     <div className="admin-row-actions">
+//                       <button
+//                         type="button"
+//                         className="admin-btn"
+//                         aria-label={"Edit " + banner.title}
+//                         onClick={function () {
+//                           startEdit(banner);
+//                         }}
+//                       >
+//                         <Pencil size={16} /> Edit
+//                       </button>
+//                       <button
+//                         type="button"
+//                         className="admin-btn admin-btn-danger"
+//                         aria-label={"Delete " + banner.title}
+//                         onClick={function () {
+//                           setDeleteId(banner._id);
+//                         }}
+//                       >
+//                         <Trash2 size={16} /> Delete
+//                       </button>
+//                     </div>
+//                   )}
+//                 </td>
+//               </tr>
+//             );
+//           })}
+//         </tbody>
+//       </table>
+//     );
+//   }
+
+//   return (
+//     <div className="admin-section">
+//       <h2 className="admin-section-title">Homepage Banners</h2>
+
+//       {message && <div className="alert alert-success">{message}</div>}
+//       {serverError && <div className="alert alert-error">{serverError}</div>}
+
+//       {/* Add / edit form */}
+//       <form className="admin-form" onSubmit={handleSubmit} noValidate>
+//         <h3 className="admin-form-title">{formTitle}</h3>
+
+//         <div className="admin-form-row">
+//           <div className="admin-field">
+//             <label htmlFor="banner-title">Title *</label>
+//             <input
+//               id="banner-title"
+//               name="title"
+//               type="text"
+//               value={formData.title}
+//               onChange={handleChange}
+//               aria-invalid={errors.title ? "true" : "false"}
+//             />
+//             {errors.title && <span className="admin-error">{errors.title}</span>}
+//           </div>
+
+//           <div className="admin-field">
+//             <label htmlFor="banner-image">Image link</label>
+//             <input
+//               id="banner-image"
+//               name="imageUrl"
+//               type="text"
+//               placeholder="https://... or /images/banner.jpg"
+//               value={formData.imageUrl}
+//               onChange={handleChange}
+//               aria-invalid={errors.imageUrl ? "true" : "false"}
+//             />
+//             {errors.imageUrl && (
+//               <span className="admin-error">{errors.imageUrl}</span>
+//             )}
+//           </div>
+//         </div>
+
+//         <div className="admin-field">
+//           <label htmlFor="banner-description">Description</label>
+//           <textarea
+//             id="banner-description"
+//             name="description"
+//             rows={2}
+//             value={formData.description}
+//             onChange={handleChange}
+//             aria-invalid={errors.description ? "true" : "false"}
+//           ></textarea>
+//           {errors.description && (
+//             <span className="admin-error">{errors.description}</span>
+//           )}
+//         </div>
+
+//         <div className="admin-form-row">
+//           <div className="admin-field">
+//             <label htmlFor="banner-button-text">Button text (optional)</label>
+//             <input
+//               id="banner-button-text"
+//               name="buttonText"
+//               type="text"
+//               value={formData.buttonText}
+//               onChange={handleChange}
+//               aria-invalid={errors.buttonText ? "true" : "false"}
+//             />
+//             {errors.buttonText && (
+//               <span className="admin-error">{errors.buttonText}</span>
+//             )}
+//           </div>
+
+//           <div className="admin-field">
+//             <label htmlFor="banner-button-link">Button link (optional)</label>
+//             <input
+//               id="banner-button-link"
+//               name="buttonLink"
+//               type="text"
+//               placeholder="/join-cta or https://..."
+//               value={formData.buttonLink}
+//               onChange={handleChange}
+//               aria-invalid={errors.buttonLink ? "true" : "false"}
+//             />
+//             {errors.buttonLink && (
+//               <span className="admin-error">{errors.buttonLink}</span>
+//             )}
+//           </div>
+//         </div>
+
+//         <div className="admin-check">
+//           <input
+//             id="banner-published"
+//             name="isPublished"
+//             type="checkbox"
+//             checked={formData.isPublished}
+//             onChange={handleChange}
+//           />
+//           <label htmlFor="banner-published">Published (visible on the website)</label>
+//         </div>
+
+//         <div className="admin-form-actions">
+//           <button type="submit" className="btn btn-primary" disabled={saving}>
+//             <Plus size={18} /> {submitText}
+//           </button>
+//           {editingId && (
+//             <button type="button" className="btn btn-outline" onClick={resetForm}>
+//               Cancel
+//             </button>
+//           )}
+//         </div>
+//       </form>
+
+//       {/* Banner list */}
+//       <div className="admin-table-wrap">{listContent}</div>
+//     </div>
+//   );
+// }
+
+// export default Banners;
 import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2, ArrowUp, ArrowDown } from "lucide-react";
-
 import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
 import UploadField from "../UploadField.jsx";
 
-// Image: for now you paste an image URL. A real file upload to Cloudinary
-// can be added later.
 const emptyForm = {
   title: "",
   description: "",
@@ -29,7 +539,7 @@ function Banners() {
   const [serverError, setServerError] = useState("");
   const [deleteId, setDeleteId] = useState("");
 
-  // Load all banners (including drafts) from the backend
+  // Load all banners, including drafts.
   useEffect(function loadBanners() {
     let isCancelled = false;
 
@@ -37,15 +547,15 @@ function Banners() {
       try {
         const result = await apiGet("/banners/admin", true);
 
-        if (isCancelled === false) {
+        if (!isCancelled) {
           setBanners(result.data);
         }
       } catch (err) {
-        if (isCancelled === false) {
+        if (!isCancelled) {
           setLoadError(err.message);
         }
       } finally {
-        if (isCancelled === false) {
+        if (!isCancelled) {
           setLoading(false);
         }
       }
@@ -77,21 +587,31 @@ function Banners() {
     }
 
     if (formData.description.length > 300) {
-      newErrors.description = "Description must be 300 characters or fewer.";
+      newErrors.description =
+        "Description must be 300 characters or fewer.";
     }
 
     const imageUrl = formData.imageUrl.trim();
-    if (imageUrl !== "" && /^(https?:\/\/|\/)/.test(imageUrl) === false) {
-      newErrors.imageUrl = "Enter a full link (https://...) or a path starting with /.";
+
+    if (
+      imageUrl !== "" &&
+      /^(https?:\/\/|\/)/.test(imageUrl) === false
+    ) {
+      newErrors.imageUrl =
+        "Enter a full link (https://...) or a path starting with /.";
     }
 
     const hasText = formData.buttonText.trim() !== "";
     const hasLink = formData.buttonLink.trim() !== "";
-    if (hasText && hasLink === false) {
-      newErrors.buttonLink = "Add a button link, or clear the button text.";
+
+    if (hasText && !hasLink) {
+      newErrors.buttonLink =
+        "Add a button link, or clear the button text.";
     }
-    if (hasLink && hasText === false) {
-      newErrors.buttonText = "Add button text, or clear the button link.";
+
+    if (hasLink && !hasText) {
+      newErrors.buttonText =
+        "Add button text, or clear the button link.";
     }
 
     return newErrors;
@@ -128,16 +648,18 @@ function Banners() {
 
     try {
       if (editingId) {
-        const result = await apiPut("/banners/" + editingId, cleanData, true);
+        const result = await apiPut(
+          "/banners/" + editingId,
+          cleanData,
+          true
+        );
 
         setBanners(
           banners.map(function (banner) {
-            if (banner._id === editingId) {
-              return result.data;
-            }
-            return banner;
+            return banner._id === editingId ? result.data : banner;
           })
         );
+
         setMessage("Banner updated.");
       } else {
         const result = await apiPost("/banners", cleanData, true);
@@ -156,6 +678,7 @@ function Banners() {
 
   function startEdit(banner) {
     setEditingId(banner._id);
+
     setFormData({
       title: banner.title,
       description: banner.description || "",
@@ -164,6 +687,7 @@ function Banners() {
       buttonLink: banner.buttonLink || "",
       isPublished: banner.isPublished,
     });
+
     setErrors({});
     setMessage("");
     setServerError("");
@@ -183,10 +707,7 @@ function Banners() {
 
       setBanners(
         banners.map(function (item) {
-          if (item._id === banner._id) {
-            return result.data;
-          }
-          return item;
+          return item._id === banner._id ? result.data : item;
         })
       );
     } catch (err) {
@@ -194,7 +715,7 @@ function Banners() {
     }
   }
 
-  // Moves a banner up (direction -1) or down (direction 1) and saves the new order
+  // Move a banner up or down and save its order.
   async function moveBanner(index, direction) {
     const newIndex = index + direction;
 
@@ -207,6 +728,7 @@ function Banners() {
 
     const copy = banners.slice();
     const movedBanner = copy[index];
+
     copy[index] = copy[newIndex];
     copy[newIndex] = movedBanner;
 
@@ -224,7 +746,6 @@ function Banners() {
         true
       );
     } catch (err) {
-      // Put the old order back if saving failed
       setBanners(previousBanners);
       setServerError(err.message);
     }
@@ -242,6 +763,7 @@ function Banners() {
           return banner._id !== id;
         })
       );
+
       setMessage("Banner deleted.");
 
       if (editingId === id) {
@@ -256,6 +778,7 @@ function Banners() {
 
   let formTitle = "Add Banner";
   let submitText = "Add Banner";
+
   if (editingId) {
     formTitle = "Edit Banner";
     submitText = "Save Changes";
@@ -270,7 +793,9 @@ function Banners() {
   if (loading) {
     listContent = <p className="loading-state">Loading banners...</p>;
   } else if (loadError) {
-    listContent = <p className="alert alert-error">{loadError}</p>;
+    listContent = (
+      <p className="alert alert-error">{loadError}</p>
+    );
   } else if (banners.length === 0) {
     listContent = <p className="empty-state">No banners yet.</p>;
   } else {
@@ -284,12 +809,14 @@ function Banners() {
             <th>Actions</th>
           </tr>
         </thead>
+
         <tbody>
           {banners.map(function (banner, index) {
             const isDeleting = deleteId === banner._id;
 
             let statusText = "Draft";
             let statusClass = "admin-status admin-status-off";
+
             if (banner.isPublished) {
               statusText = "Published";
               statusClass = "admin-status admin-status-on";
@@ -310,6 +837,7 @@ function Banners() {
                     >
                       <ArrowUp size={16} />
                     </button>
+
                     <button
                       type="button"
                       className="admin-btn"
@@ -323,7 +851,9 @@ function Banners() {
                     </button>
                   </div>
                 </td>
+
                 <td>{banner.title}</td>
+
                 <td>
                   <button
                     type="button"
@@ -336,10 +866,12 @@ function Banners() {
                     {statusText}
                   </button>
                 </td>
+
                 <td>
                   {isDeleting ? (
                     <div className="admin-confirm">
                       <span>Delete this banner?</span>
+
                       <button
                         type="button"
                         className="admin-btn admin-btn-danger"
@@ -349,6 +881,7 @@ function Banners() {
                       >
                         Yes, delete
                       </button>
+
                       <button
                         type="button"
                         className="admin-btn"
@@ -371,6 +904,7 @@ function Banners() {
                       >
                         <Pencil size={16} /> Edit
                       </button>
+
                       <button
                         type="button"
                         className="admin-btn admin-btn-danger"
@@ -396,8 +930,13 @@ function Banners() {
     <div className="admin-section">
       <h2 className="admin-section-title">Homepage Banners</h2>
 
-      {message && <div className="alert alert-success">{message}</div>}
-      {serverError && <div className="alert alert-error">{serverError}</div>}
+      {message && (
+        <div className="alert alert-success">{message}</div>
+      )}
+
+      {serverError && (
+        <div className="alert alert-error">{serverError}</div>
+      )}
 
       {/* Add / edit form */}
       <form className="admin-form" onSubmit={handleSubmit} noValidate>
@@ -406,6 +945,7 @@ function Banners() {
         <div className="admin-form-row">
           <div className="admin-field">
             <label htmlFor="banner-title">Title *</label>
+
             <input
               id="banner-title"
               name="title"
@@ -414,28 +954,27 @@ function Banners() {
               onChange={handleChange}
               aria-invalid={errors.title ? "true" : "false"}
             />
-            {errors.title && <span className="admin-error">{errors.title}</span>}
-          </div>
 
-          <div className="admin-field">
-            <label htmlFor="banner-image">Image link</label>
-            <input
-              id="banner-image"
-              name="imageUrl"
-              type="text"
-              placeholder="https://... or /images/banner.jpg"
-              value={formData.imageUrl}
-              onChange={handleChange}
-              aria-invalid={errors.imageUrl ? "true" : "false"}
-            />
-            {errors.imageUrl && (
-              <span className="admin-error">{errors.imageUrl}</span>
+            {errors.title && (
+              <span className="admin-error">{errors.title}</span>
             )}
           </div>
+
+          <UploadField
+            id="banner-image"
+            label="Banner image"
+            kind="image"
+            value={formData.imageUrl}
+            onChange={function (url) {
+              setFormData({ ...formData, imageUrl: url });
+            }}
+            error={errors.imageUrl}
+          />
         </div>
 
         <div className="admin-field">
           <label htmlFor="banner-description">Description</label>
+
           <textarea
             id="banner-description"
             name="description"
@@ -443,15 +982,21 @@ function Banners() {
             value={formData.description}
             onChange={handleChange}
             aria-invalid={errors.description ? "true" : "false"}
-          ></textarea>
+          />
+
           {errors.description && (
-            <span className="admin-error">{errors.description}</span>
+            <span className="admin-error">
+              {errors.description}
+            </span>
           )}
         </div>
 
         <div className="admin-form-row">
           <div className="admin-field">
-            <label htmlFor="banner-button-text">Button text (optional)</label>
+            <label htmlFor="banner-button-text">
+              Button text (optional)
+            </label>
+
             <input
               id="banner-button-text"
               name="buttonText"
@@ -460,13 +1005,19 @@ function Banners() {
               onChange={handleChange}
               aria-invalid={errors.buttonText ? "true" : "false"}
             />
+
             {errors.buttonText && (
-              <span className="admin-error">{errors.buttonText}</span>
+              <span className="admin-error">
+                {errors.buttonText}
+              </span>
             )}
           </div>
 
           <div className="admin-field">
-            <label htmlFor="banner-button-link">Button link (optional)</label>
+            <label htmlFor="banner-button-link">
+              Button link (optional)
+            </label>
+
             <input
               id="banner-button-link"
               name="buttonLink"
@@ -476,8 +1027,11 @@ function Banners() {
               onChange={handleChange}
               aria-invalid={errors.buttonLink ? "true" : "false"}
             />
+
             {errors.buttonLink && (
-              <span className="admin-error">{errors.buttonLink}</span>
+              <span className="admin-error">
+                {errors.buttonLink}
+              </span>
             )}
           </div>
         </div>
@@ -490,15 +1044,27 @@ function Banners() {
             checked={formData.isPublished}
             onChange={handleChange}
           />
-          <label htmlFor="banner-published">Published (visible on the website)</label>
+
+          <label htmlFor="banner-published">
+            Published (visible on the website)
+          </label>
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={saving}
+          >
             <Plus size={18} /> {submitText}
           </button>
+
           {editingId && (
-            <button type="button" className="btn btn-outline" onClick={resetForm}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={resetForm}
+            >
               Cancel
             </button>
           )}

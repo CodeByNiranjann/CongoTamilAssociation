@@ -1,31 +1,9 @@
 // src/admin/sections/Gallery.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 
-// TEMPORARY sample data (generic text, not official CTA content).
-// Add, edit, delete and publish only change this page's memory for now.
-// They are connected to the real backend API later.
-// Cover image: for now you paste an image URL. Later this becomes a file upload to Cloudinary.
-const startingGalleries = [
-  {
-    _id: "g1",
-    title: "Sample album one",
-    date: "2026-06-10",
-    description: "Sample description.",
-    coverImageUrl: "",
-    albumLink: "",
-    isPublished: true,
-  },
-  {
-    _id: "g2",
-    title: "Sample album two",
-    date: "2026-08-22",
-    description: "",
-    coverImageUrl: "",
-    albumLink: "https://drive.google.com",
-    isPublished: false,
-  },
-];
+import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
+import UploadField from "../UploadField.jsx";
 
 const emptyForm = {
   title: "",
@@ -36,13 +14,52 @@ const emptyForm = {
   isPublished: true,
 };
 
+function toDateText(dateValue) {
+  if (!dateValue) {
+    return "";
+  }
+  return String(dateValue).slice(0, 10);
+}
+
 function Gallery() {
-  const [galleries, setGalleries] = useState(startingGalleries);
+  const [galleries, setGalleries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+
   const [formData, setFormData] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
+  const [serverError, setServerError] = useState("");
   const [deleteId, setDeleteId] = useState("");
+
+  useEffect(function loadGalleries() {
+    let isCancelled = false;
+
+    async function fetchGalleries() {
+      try {
+        const result = await apiGet("/gallery/admin", true);
+        if (isCancelled === false) {
+          setGalleries(result.data);
+        }
+      } catch (err) {
+        if (isCancelled === false) {
+          setLoadError(err.message);
+        }
+      } finally {
+        if (isCancelled === false) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchGalleries();
+
+    return function cleanup() {
+      isCancelled = true;
+    };
+  }, []);
 
   function handleChange(event) {
     const fieldName = event.target.name;
@@ -74,15 +91,15 @@ function Gallery() {
       newErrors.description = "Description must be 1000 characters or fewer.";
     }
 
-    const coverImageUrl = formData.coverImageUrl.trim();
-    if (coverImageUrl !== "" && /^(https?:\/\/|\/)/.test(coverImageUrl) === false) {
-      newErrors.coverImageUrl = "Enter a full link (https://...) or a path starting with /.";
+    const cover = formData.coverImageUrl.trim();
+    if (cover !== "" && /^(https?:\/\/|\/)/.test(cover) === false) {
+      newErrors.coverImageUrl = "Enter a full link (https://...) or upload an image.";
     }
 
-    const albumLink = formData.albumLink.trim();
-    if (albumLink === "") {
+    const album = formData.albumLink.trim();
+    if (album === "") {
       newErrors.albumLink = "Google Drive album link is required.";
-    } else if (/^https?:\/\//.test(albumLink) === false) {
+    } else if (/^https?:\/\//.test(album) === false) {
       newErrors.albumLink = "Enter a full link starting with https://";
     }
 
@@ -95,9 +112,10 @@ function Gallery() {
     setErrors({});
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     setMessage("");
+    setServerError("");
 
     const newErrors = validateForm();
     setErrors(newErrors);
@@ -115,29 +133,39 @@ function Gallery() {
       isPublished: formData.isPublished,
     };
 
-    if (editingId) {
-      const updatedList = galleries.map(function (item) {
-        if (item._id === editingId) {
-          return { ...item, ...cleanData };
-        }
-        return item;
-      });
-      setGalleries(updatedList);
-      setMessage("Album updated.");
-    } else {
-      const newItem = { _id: "local-" + Date.now(), ...cleanData };
-      setGalleries([newItem, ...galleries]);
-      setMessage("Album added.");
-    }
+    setSaving(true);
 
-    resetForm();
+    try {
+      if (editingId) {
+        const result = await apiPut("/gallery/" + editingId, cleanData, true);
+        setGalleries(
+          galleries.map(function (item) {
+            if (item._id === editingId) {
+              return result.data;
+            }
+            return item;
+          })
+        );
+        setMessage("Album updated.");
+      } else {
+        const result = await apiPost("/gallery", cleanData, true);
+        setGalleries([result.data, ...galleries]);
+        setMessage("Album added.");
+      }
+
+      resetForm();
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function startEdit(item) {
     setEditingId(item._id);
     setFormData({
       title: item.title,
-      date: item.date,
+      date: toDateText(item.date),
       description: item.description || "",
       coverImageUrl: item.coverImageUrl || "",
       albumLink: item.albumLink || "",
@@ -145,29 +173,53 @@ function Gallery() {
     });
     setErrors({});
     setMessage("");
+    setServerError("");
     window.scrollTo(0, 0);
   }
 
-  function togglePublished(id) {
-    const updatedList = galleries.map(function (item) {
-      if (item._id === id) {
-        return { ...item, isPublished: !item.isPublished };
-      }
-      return item;
-    });
-    setGalleries(updatedList);
+  async function togglePublished(item) {
+    setMessage("");
+    setServerError("");
+
+    try {
+      const result = await apiPut(
+        "/gallery/" + item._id,
+        { isPublished: !item.isPublished },
+        true
+      );
+      setGalleries(
+        galleries.map(function (current) {
+          if (current._id === item._id) {
+            return result.data;
+          }
+          return current;
+        })
+      );
+    } catch (err) {
+      setServerError(err.message);
+    }
   }
 
-  function confirmDelete(id) {
-    const remaining = galleries.filter(function (item) {
-      return item._id !== id;
-    });
-    setGalleries(remaining);
-    setDeleteId("");
-    setMessage("Album deleted.");
+  async function confirmDelete(id) {
+    setMessage("");
+    setServerError("");
 
-    if (editingId === id) {
-      resetForm();
+    try {
+      await apiDelete("/gallery/" + id, true);
+      setGalleries(
+        galleries.filter(function (item) {
+          return item._id !== id;
+        })
+      );
+      setMessage("Album deleted.");
+
+      if (editingId === id) {
+        resetForm();
+      }
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setDeleteId("");
     }
   }
 
@@ -177,14 +229,119 @@ function Gallery() {
     formTitle = "Edit Album";
     submitText = "Save Changes";
   }
+  if (saving) {
+    submitText = "Saving...";
+  }
+
+  let listContent = null;
+
+  if (loading) {
+    listContent = <p className="loading-state">Loading albums...</p>;
+  } else if (loadError) {
+    listContent = <p className="alert alert-error">{loadError}</p>;
+  } else if (galleries.length === 0) {
+    listContent = <p className="empty-state">No albums yet.</p>;
+  } else {
+    listContent = (
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>Album</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {galleries.map(function (item) {
+            const isDeleting = deleteId === item._id;
+
+            let statusText = "Draft";
+            let statusClass = "admin-status admin-status-off";
+            if (item.isPublished) {
+              statusText = "Published";
+              statusClass = "admin-status admin-status-on";
+            }
+
+            return (
+              <tr key={item._id}>
+                <td>{item.title}</td>
+                <td>{toDateText(item.date)}</td>
+                <td>
+                  <button
+                    type="button"
+                    className={statusClass}
+                    aria-label={"Toggle published for " + item.title}
+                    onClick={function () {
+                      togglePublished(item);
+                    }}
+                  >
+                    {statusText}
+                  </button>
+                </td>
+                <td>
+                  {isDeleting ? (
+                    <div className="admin-confirm">
+                      <span>Delete this album?</span>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        onClick={function () {
+                          confirmDelete(item._id);
+                        }}
+                      >
+                        Yes, delete
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        onClick={function () {
+                          setDeleteId("");
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="admin-row-actions">
+                      <button
+                        type="button"
+                        className="admin-btn"
+                        aria-label={"Edit " + item.title}
+                        onClick={function () {
+                          startEdit(item);
+                        }}
+                      >
+                        <Pencil size={16} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="admin-btn admin-btn-danger"
+                        aria-label={"Delete " + item.title}
+                        onClick={function () {
+                          setDeleteId(item._id);
+                        }}
+                      >
+                        <Trash2 size={16} /> Delete
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  }
 
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">Gallery</h2>
 
       {message && <div className="alert alert-success">{message}</div>}
+      {serverError && <div className="alert alert-error">{serverError}</div>}
 
-      {/* Add / edit form */}
       <form className="admin-form" onSubmit={handleSubmit} noValidate>
         <h3 className="admin-form-title">{formTitle}</h3>
 
@@ -231,38 +388,31 @@ function Gallery() {
           )}
         </div>
 
-        <div className="admin-form-row">
-          <div className="admin-field">
-            <label htmlFor="gallery-cover">Cover image link</label>
-            <input
-              id="gallery-cover"
-              name="coverImageUrl"
-              type="text"
-              placeholder="https://... or /images/cover.jpg"
-              value={formData.coverImageUrl}
-              onChange={handleChange}
-              aria-invalid={errors.coverImageUrl ? "true" : "false"}
-            />
-            {errors.coverImageUrl && (
-              <span className="admin-error">{errors.coverImageUrl}</span>
-            )}
-          </div>
+        <UploadField
+          id="gallery-cover"
+          label="Cover image"
+          kind="image"
+          value={formData.coverImageUrl}
+          onChange={function (url) {
+            setFormData({ ...formData, coverImageUrl: url });
+          }}
+          error={errors.coverImageUrl}
+        />
 
-          <div className="admin-field">
-            <label htmlFor="gallery-album">Google Drive album link *</label>
-            <input
-              id="gallery-album"
-              name="albumLink"
-              type="text"
-              placeholder="https://drive.google.com/..."
-              value={formData.albumLink}
-              onChange={handleChange}
-              aria-invalid={errors.albumLink ? "true" : "false"}
-            />
-            {errors.albumLink && (
-              <span className="admin-error">{errors.albumLink}</span>
-            )}
-          </div>
+        <div className="admin-field">
+          <label htmlFor="gallery-album">Google Drive album link *</label>
+          <input
+            id="gallery-album"
+            name="albumLink"
+            type="text"
+            placeholder="https://drive.google.com/..."
+            value={formData.albumLink}
+            onChange={handleChange}
+            aria-invalid={errors.albumLink ? "true" : "false"}
+          />
+          {errors.albumLink && (
+            <span className="admin-error">{errors.albumLink}</span>
+          )}
         </div>
 
         <div className="admin-check">
@@ -273,13 +423,11 @@ function Gallery() {
             checked={formData.isPublished}
             onChange={handleChange}
           />
-          <label htmlFor="gallery-published">
-            Published (visible on the website)
-          </label>
+          <label htmlFor="gallery-published">Published (visible on the website)</label>
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
+          <button type="submit" className="btn btn-primary" disabled={saving}>
             <Plus size={18} /> {submitText}
           </button>
           {editingId && (
@@ -290,102 +438,7 @@ function Gallery() {
         </div>
       </form>
 
-      {/* Album list */}
-      <div className="admin-table-wrap">
-        {galleries.length === 0 ? (
-          <p className="empty-state">No albums yet.</p>
-        ) : (
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Album</th>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {galleries.map(function (item) {
-                const isDeleting = deleteId === item._id;
-
-                let statusText = "Draft";
-                let statusClass = "admin-status admin-status-off";
-                if (item.isPublished) {
-                  statusText = "Published";
-                  statusClass = "admin-status admin-status-on";
-                }
-
-                return (
-                  <tr key={item._id}>
-                    <td>{item.title}</td>
-                    <td>{item.date}</td>
-                    <td>
-                      <button
-                        type="button"
-                        className={statusClass}
-                        aria-label={"Toggle published for " + item.title}
-                        onClick={function () {
-                          togglePublished(item._id);
-                        }}
-                      >
-                        {statusText}
-                      </button>
-                    </td>
-                    <td>
-                      {isDeleting ? (
-                        <div className="admin-confirm">
-                          <span>Delete this album?</span>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            onClick={function () {
-                              confirmDelete(item._id);
-                            }}
-                          >
-                            Yes, delete
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            onClick={function () {
-                              setDeleteId("");
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="admin-row-actions">
-                          <button
-                            type="button"
-                            className="admin-btn"
-                            aria-label={"Edit " + item.title}
-                            onClick={function () {
-                              startEdit(item);
-                            }}
-                          >
-                            <Pencil size={16} /> Edit
-                          </button>
-                          <button
-                            type="button"
-                            className="admin-btn admin-btn-danger"
-                            aria-label={"Delete " + item.title}
-                            onClick={function () {
-                              setDeleteId(item._id);
-                            }}
-                          >
-                            <Trash2 size={16} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <div className="admin-table-wrap">{listContent}</div>
     </div>
   );
 }
