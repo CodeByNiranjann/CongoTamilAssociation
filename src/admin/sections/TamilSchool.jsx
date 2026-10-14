@@ -1,7 +1,6 @@
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Save, Plus, Trash2, Pencil } from "lucide-react";
-import { apiGet, apiPut, apiDelete } from "../../api.js";
+import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
 
 const startingSchool = {
   introduction: "",
@@ -23,6 +22,11 @@ function linesToList(text) {
     .filter((line) => line !== "");
 }
 
+function formatDate(date) {
+  if (!date) return "";
+  return String(date).slice(0, 10);
+}
+
 function TamilSchool() {
   // School information
   const [savedSchool, setSavedSchool] = useState(startingSchool);
@@ -36,13 +40,17 @@ function TamilSchool() {
   const [schoolMessage, setSchoolMessage] = useState("");
   const [schoolServerError, setSchoolServerError] = useState("");
 
-  // Announcements: local state, as in your existing file
+  // Announcements stored in MongoDB through the backend
   const [announcements, setAnnouncements] = useState([]);
+  const [announcementLoading, setAnnouncementLoading] = useState(true);
+  const [announcementSaving, setAnnouncementSaving] = useState(false);
   const [announcementForm, setAnnouncementForm] =
     useState(emptyAnnouncementForm);
   const [editingId, setEditingId] = useState("");
   const [announcementErrors, setAnnouncementErrors] = useState({});
   const [announcementMessage, setAnnouncementMessage] = useState("");
+  const [announcementServerError, setAnnouncementServerError] =
+    useState("");
   const [deleteId, setDeleteId] = useState("");
 
   // Load school information
@@ -86,7 +94,32 @@ function TamilSchool() {
     };
   }, []);
 
-  // Save school information to MongoDB
+  // Load only Tamil School announcements, including drafts.
+  const loadAnnouncements = useCallback(async () => {
+    setAnnouncementLoading(true);
+    setAnnouncementServerError("");
+
+    try {
+      const result = await apiGet(
+        "/announcements/admin?section=tamil-school",
+        true
+      );
+
+      setAnnouncements(Array.isArray(result.data) ? result.data : []);
+    } catch (err) {
+      setAnnouncementServerError(
+        "Could not load announcements: " + err.message
+      );
+    } finally {
+      setAnnouncementLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, [loadAnnouncements]);
+
+  // Save school information to the backend
   async function handleSchoolSubmit(event) {
     event.preventDefault();
 
@@ -126,11 +159,13 @@ function TamilSchool() {
 
     try {
       const result = await apiPut("/tamil-school", cleanData, true);
-      const data = result.data;
+      const data = result.data || cleanData;
 
       const updatedSchool = {
         introduction: data.introduction || "",
-        activities: Array.isArray(data.activities) ? data.activities : [],
+        activities: Array.isArray(data.activities)
+          ? data.activities
+          : [],
         images: Array.isArray(data.images) ? data.images : [],
       };
 
@@ -155,7 +190,7 @@ function TamilSchool() {
     setSchoolServerError("");
   }
 
-  // DELETE ALL SCHOOL INFORMATION FROM DATABASE
+  // Delete school information. This requires a matching backend DELETE route.
   async function handleDeleteAllSchoolInfo() {
     const confirmed = window.confirm(
       "Delete all Tamil School information from the database? This cannot be undone."
@@ -181,25 +216,22 @@ function TamilSchool() {
       setActivitiesText("");
       setImagesText("");
       setSchoolErrors({});
-
-      setSchoolMessage(
-        "Tamil School information deleted successfully."
-      );
-    } catch (error) {
-      setSchoolServerError("Delete failed: " + error.message);
+      setSchoolMessage("Tamil School information deleted successfully.");
+    } catch (err) {
+      setSchoolServerError("Delete failed: " + err.message);
     } finally {
       setSchoolSaving(false);
     }
   }
 
-  // Announcement handlers (local state only)
+  // Announcement form field changes
   function handleAnnouncementChange(event) {
     const { name, type, value, checked } = event.target;
 
-    setAnnouncementForm({
-      ...announcementForm,
+    setAnnouncementForm((current) => ({
+      ...current,
       [name]: type === "checkbox" ? checked : value,
-    });
+    }));
   }
 
   function resetAnnouncementForm() {
@@ -208,87 +240,136 @@ function TamilSchool() {
     setAnnouncementErrors({});
   }
 
-  function handleAnnouncementSubmit(event) {
+  // Create or update an announcement in MongoDB
+  async function handleAnnouncementSubmit(event) {
     event.preventDefault();
+
     setAnnouncementMessage("");
+    setAnnouncementServerError("");
 
     const errors = {};
+    const title = announcementForm.title.trim();
+    const message = announcementForm.message.trim();
 
-    if (!announcementForm.title.trim()) {
+    if (!title) {
       errors.title = "Title is required.";
-    }
-
-    if (announcementForm.title.length > 120) {
+    } else if (title.length > 120) {
       errors.title = "Title must be 120 characters or fewer.";
     }
 
-    if (announcementForm.message.length > 1000) {
+    if (message.length > 1000) {
       errors.message = "Message must be 1000 characters or fewer.";
     }
 
     if (!announcementForm.date) {
       errors.date = "Date is required.";
+    } else if (
+      Number.isNaN(new Date(announcementForm.date).getTime())
+    ) {
+      errors.date = "Enter a valid date.";
     }
 
     setAnnouncementErrors(errors);
     if (Object.keys(errors).length > 0) return;
 
     const cleanData = {
-      title: announcementForm.title.trim(),
-      message: announcementForm.message.trim(),
+      title,
+      message,
       date: announcementForm.date,
       isPublished: announcementForm.isPublished,
+      section: "tamil-school",
     };
 
-    if (editingId) {
-      setAnnouncements((current) =>
-        current.map((item) =>
-          item._id === editingId ? { ...item, ...cleanData } : item
-        )
-      );
-      setAnnouncementMessage("Announcement updated locally.");
-    } else {
-      setAnnouncements((current) => [
-        { _id: "local-" + Date.now(), ...cleanData },
-        ...current,
-      ]);
-      setAnnouncementMessage("Announcement added locally.");
-    }
+    setAnnouncementSaving(true);
 
-    resetAnnouncementForm();
+    try {
+      if (editingId) {
+        await apiPut(
+          `/announcements/${editingId}`,
+          cleanData,
+          true
+        );
+        setAnnouncementMessage("Announcement updated successfully.");
+      } else {
+        await apiPost("/announcements", cleanData, true);
+        setAnnouncementMessage("Announcement saved successfully.");
+      }
+
+      resetAnnouncementForm();
+      setDeleteId("");
+      await loadAnnouncements();
+    } catch (err) {
+      setAnnouncementServerError(
+        "Could not save announcement: " + err.message
+      );
+    } finally {
+      setAnnouncementSaving(false);
+    }
   }
 
   function startEdit(item) {
     setEditingId(item._id);
     setAnnouncementForm({
-      title: item.title,
+      title: item.title || "",
       message: item.message || "",
-      date: item.date,
-      isPublished: item.isPublished,
+      date: formatDate(item.date),
+      isPublished: item.isPublished === true,
     });
+
     setAnnouncementErrors({});
     setAnnouncementMessage("");
+    setAnnouncementServerError("");
   }
 
-  function togglePublished(id) {
-    setAnnouncements((current) =>
-      current.map((item) =>
-        item._id === id
-          ? { ...item, isPublished: !item.isPublished }
-          : item
-      )
-    );
+  // Publish or unpublish in the database
+  async function togglePublished(item) {
+    setAnnouncementMessage("");
+    setAnnouncementServerError("");
+
+    try {
+      await apiPut(
+        `/announcements/${item._id}`,
+        {
+          isPublished: !item.isPublished,
+          section: "tamil-school",
+        },
+        true
+      );
+
+      setAnnouncementMessage(
+        !item.isPublished
+          ? "Announcement published successfully."
+          : "Announcement moved to drafts successfully."
+      );
+
+      await loadAnnouncements();
+    } catch (err) {
+      setAnnouncementServerError(
+        "Could not update publication status: " + err.message
+      );
+    }
   }
 
-  function confirmDelete(id) {
-    setAnnouncements((current) =>
-      current.filter((item) => item._id !== id)
-    );
+  // Delete an announcement from the database
+  async function confirmDelete(id) {
+    setAnnouncementMessage("");
+    setAnnouncementServerError("");
 
-    setDeleteId("");
-    setAnnouncementMessage("Announcement deleted locally.");
+    try {
+      await apiDelete(`/announcements/${id}`, true);
 
-    if (editingId === id) resetAnnouncementForm();
+      if (editingId === id) {
+        resetAnnouncementForm();
+      }
+
+      setDeleteId("");
+      setAnnouncementMessage("Announcement deleted successfully.");
+      await loadAnnouncements();
+    } catch (err) {
+      setAnnouncementServerError(
+        "Could not delete announcement: " + err.message
+      );
+    }
   }
 
   const announcementFormTitle = editingId
@@ -405,7 +486,15 @@ function TamilSchool() {
       <h2 className="admin-section-title">School Announcements</h2>
 
       {announcementMessage && (
-        <div className="alert alert-success">{announcementMessage}</div>
+        <div className="alert alert-success">
+          {announcementMessage}
+        </div>
+      )}
+
+      {announcementServerError && (
+        <div className="alert alert-error">
+          {announcementServerError}
+        </div>
       )}
 
       <form
@@ -422,6 +511,7 @@ function TamilSchool() {
               id="tsa-title"
               name="title"
               type="text"
+              maxLength={120}
               value={announcementForm.title}
               onChange={handleAnnouncementChange}
               aria-invalid={Boolean(announcementErrors.title)}
@@ -457,6 +547,7 @@ function TamilSchool() {
             id="tsa-message"
             name="message"
             rows={3}
+            maxLength={1000}
             value={announcementForm.message}
             onChange={handleAnnouncementChange}
             aria-invalid={Boolean(announcementErrors.message)}
@@ -482,8 +573,13 @@ function TamilSchool() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary">
-            <Plus size={18} /> {announcementSubmitText}
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={announcementSaving}
+          >
+            <Plus size={18} />
+            {announcementSaving ? "Saving..." : announcementSubmitText}
           </button>
 
           {editingId && (
@@ -491,6 +587,7 @@ function TamilSchool() {
               type="button"
               className="btn btn-outline"
               onClick={resetAnnouncementForm}
+              disabled={announcementSaving}
             >
               Cancel
             </button>
@@ -499,7 +596,9 @@ function TamilSchool() {
       </form>
 
       <div className="admin-table-wrap">
-        {announcements.length === 0 ? (
+        {announcementLoading ? (
+          <p className="loading-state">Loading announcements...</p>
+        ) : announcements.length === 0 ? (
           <p className="empty-state">No announcements yet.</p>
         ) : (
           <table className="admin-table">
@@ -511,6 +610,7 @@ function TamilSchool() {
                 <th>Actions</th>
               </tr>
             </thead>
+
             <tbody>
               {announcements.map((item) => {
                 const isDeleting = deleteId === item._id;
@@ -518,7 +618,7 @@ function TamilSchool() {
                 return (
                   <tr key={item._id}>
                     <td>{item.title}</td>
-                    <td>{item.date}</td>
+                    <td>{formatDate(item.date)}</td>
                     <td>
                       <button
                         type="button"
@@ -527,7 +627,8 @@ function TamilSchool() {
                             ? "admin-status admin-status-on"
                             : "admin-status admin-status-off"
                         }
-                        onClick={() => togglePublished(item._id)}
+                        onClick={() => togglePublished(item)}
+                        disabled={announcementSaving}
                       >
                         {item.isPublished ? "Published" : "Draft"}
                       </button>
