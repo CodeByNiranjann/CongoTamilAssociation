@@ -6,12 +6,14 @@ const linkPattern = /^(https?:\/\/|\/)/;
 
 const bannerSchema = new mongoose.Schema(
   {
-    title: {
-      type: String,
-      required: [true, "Title is required"],
-      trim: true,
-      maxlength: [120, "Title must be 120 characters or fewer"],
-    },
+    
+  title: {
+  type: String,
+  required: false,
+  trim: true,
+  maxlength: [120, "Title must be 120 characters or fewer"],
+  default: "",
+  },
     description: {
       type: String,
       trim: true,
