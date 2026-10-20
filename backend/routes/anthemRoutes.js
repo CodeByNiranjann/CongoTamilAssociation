@@ -1,7 +1,11 @@
 // backend/routes/anthemRoutes.js
 import express from "express";
 
-import { getAnthem, saveAnthem } from "../controllers/anthemController.js";
+import {
+  getAnthem,
+  saveAnthem,
+  deleteAnthem,
+} from "../controllers/anthemController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
@@ -11,5 +15,8 @@ router.get("/", getAnthem);
 
 // Admin only: create or update the anthem
 router.put("/", protect, saveAnthem);
+
+// Admin only: delete the anthem record
+router.delete("/", protect, deleteAnthem);
 
 export default router;

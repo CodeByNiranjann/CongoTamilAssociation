@@ -17,6 +17,7 @@ import {
   FileText,
   Phone,
   X,
+  FolderOpen,
 } from "lucide-react";
 
 // Props: isOpen, onClose, newJoinCount, newJobCount
@@ -27,6 +28,7 @@ function AdminSidebar(props) {
 
   const links = [
     { path: "/admin/dashboard", label: "Dashboard", icon: <LayoutDashboard size={18} />, end: true },
+    { path: "/admin/dashboard/files", label: "Files & Media", icon: <FolderOpen size={18} /> },
     { path: "/admin/dashboard/banners", label: "Homepage Banners", icon: <ImageIcon size={18} /> },
     { path: "/admin/dashboard/announcements", label: "Announcements", icon: <Megaphone size={18} /> },
     { path: "/admin/dashboard/events", label: "Upcoming Events", icon: <Calendar size={18} /> },

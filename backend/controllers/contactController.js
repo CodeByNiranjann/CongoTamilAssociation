@@ -120,6 +120,30 @@ export async function saveContactInfo(req, res, next) {
   }
 }
 
+// DELETE /api/v1/contact   (admin only)
+// Deletes the contact record from the database
+export async function deleteContactInfo(req, res, next) {
+  try {
+    const contact = await Contact.findOne();
+
+    if (!contact) {
+      return res.status(200).json({
+        success: true,
+        message: "No contact information to delete.",
+      });
+    }
+
+    await Contact.deleteMany({});
+
+    res.status(200).json({
+      success: true,
+      message: "Contact information deleted successfully.",
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // POST /api/v1/contact/message   (public)
 // Body: { name, email, subject, message }
 // Messages are not stored. They are emailed to the CTA address, and the

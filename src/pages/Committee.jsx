@@ -102,16 +102,15 @@ function Committee() {
           subtitle="The people who serve our community"
         />
 
-        {groups.map(function (group, index) {
-          let heading = "Committee " + group.year;
-          if (index === 0) {
-            heading = "Current Committee " + group.year;
-          }
+        {groups.map(function (group) {
+          const heading = group.year.toLowerCase().includes("office")
+            ? group.year
+            : "Office Bearers " + group.year;
 
           return (
             <div key={group.year} className="committee-group">
-              <h3 className="committee-year">{heading}</h3>
-              <div className="grid grid-3">
+              <h2 className="committee-year-heading">{heading}</h2>
+              <div className="committee-grid">
                 {group.members.map(function (member) {
                   return <CommitteeCard key={member._id} member={member} />;
                 })}

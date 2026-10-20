@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "server": "node backend/server.js",
+    "server": "node --watch-path=backend backend/server.js",
     "create-admin": "node backend/createAdmin.js",
     "build": "vite build",
     "lint": "eslint .",

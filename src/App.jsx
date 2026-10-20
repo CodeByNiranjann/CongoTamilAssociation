@@ -34,6 +34,7 @@ import AdminLogin from "./admin/AdminLogin.jsx";
 import AdminDashboard from "./admin/AdminDashboard.jsx";
 
 // Admin sections
+import AdminFiles from "./admin/sections/Files.jsx";
 import AdminBanners from "./admin/sections/Banners.jsx";
 import AdminAnnouncements from "./admin/sections/Announcements.jsx";
 import AdminEvents from "./admin/sections/Events.jsx";
@@ -109,6 +110,7 @@ function App() {
           </ProtectedRoute>
         }
       >
+        <Route path="files" element={<AdminFiles />} />
         <Route path="banners" element={<AdminBanners />} />
         <Route path="announcements" element={<AdminAnnouncements />} />
         <Route path="events" element={<AdminEvents />} />

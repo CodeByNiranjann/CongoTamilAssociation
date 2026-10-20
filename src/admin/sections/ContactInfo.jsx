@@ -2,9 +2,10 @@
 import { useState, useEffect } from "react";
 import { Save, Plus, Trash2 } from "lucide-react";
 
-import { apiGet, apiPut } from "../../api.js";
+import { apiGet, apiPut, apiDelete } from "../../api.js";
 
 const emptyContact = {
+  _id: "",
   email: "",
   phone: "",
   address: "",
@@ -18,10 +19,14 @@ const emptySocialForm = {
 
 function ContactInfo() {
   const [formData, setFormData] = useState(emptyContact);
+  const [savedData, setSavedData] = useState(emptyContact);
   const [socialLinks, setSocialLinks] = useState([]);
+  const [savedSocialLinks, setSavedSocialLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const [serverError, setServerError] = useState("");
@@ -37,17 +42,21 @@ function ContactInfo() {
         const result = await apiGet("/contact");
 
         if (isCancelled === false) {
-          setFormData({
+          const loadedContact = {
+            _id: result.data._id || "",
             email: result.data.email || "",
             phone: result.data.phone || "",
             address: result.data.address || "",
             youtubeUrl: result.data.youtubeUrl || "",
+          };
+          const loadedSocial = (result.data.socialLinks || []).map(function (item) {
+            return { name: item.name, url: item.url };
           });
-          setSocialLinks(
-            (result.data.socialLinks || []).map(function (item) {
-              return { name: item.name, url: item.url };
-            })
-          );
+
+          setFormData(loadedContact);
+          setSavedData(loadedContact);
+          setSocialLinks(loadedSocial);
+          setSavedSocialLinks(loadedSocial);
         }
       } catch (err) {
         if (isCancelled === false) {
@@ -158,7 +167,7 @@ function ContactInfo() {
     setSaving(true);
 
     try {
-      await apiPut(
+      const result = await apiPut(
         "/contact",
         {
           email: formData.email.trim(),
@@ -169,11 +178,56 @@ function ContactInfo() {
         },
         true
       );
+      const savedContact = {
+        _id: result.data._id || "",
+        email: result.data.email || "",
+        phone: result.data.phone || "",
+        address: result.data.address || "",
+        youtubeUrl: result.data.youtubeUrl || "",
+      };
+      const savedSocial = (result.data.socialLinks || []).map(function (item) {
+        return { name: item.name, url: item.url };
+      });
+      setFormData(savedContact);
+      setSavedData(savedContact);
+      setSocialLinks(savedSocial);
+      setSavedSocialLinks(savedSocial);
       setMessage("Contact information saved.");
     } catch (err) {
       setServerError(err.message);
     } finally {
       setSaving(false);
+    }
+  }
+
+  function handleReset() {
+    setFormData(savedData);
+    setSocialLinks(savedSocialLinks);
+    setErrors({});
+    setMessage("");
+    setServerError("");
+    setIsDeleting(false);
+  }
+
+  async function handleDelete() {
+    setMessage("");
+    setServerError("");
+    setDeleting(true);
+
+    try {
+      await apiDelete("/contact", true);
+
+      setFormData(emptyContact);
+      setSavedData(emptyContact);
+      setSocialLinks([]);
+      setSavedSocialLinks([]);
+      setErrors({});
+      setMessage("Contact information deleted successfully.");
+    } catch (err) {
+      setServerError(err.message || "Failed to delete contact information.");
+    } finally {
+      setDeleting(false);
+      setIsDeleting(false);
     }
   }
 
@@ -189,6 +243,15 @@ function ContactInfo() {
   if (saving) {
     buttonText = "Saving...";
   }
+
+  const hasSavedContact = Boolean(
+    savedData._id ||
+      savedData.email ||
+      savedData.phone ||
+      savedData.address ||
+      savedData.youtubeUrl ||
+      savedSocialLinks.length > 0
+  );
 
   return (
     <div className="admin-section">
@@ -261,9 +324,58 @@ function ContactInfo() {
         </div>
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={saving || deleting}
+          >
             <Save size={18} /> {buttonText}
           </button>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleReset}
+            disabled={saving || deleting}
+          >
+            Undo Changes
+          </button>
+
+          {isDeleting ? (
+            <div className="admin-confirm">
+              <span>Delete contact information?</span>
+              <button
+                type="button"
+                className="admin-btn admin-btn-danger"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Yes, delete"}
+              </button>
+              <button
+                type="button"
+                className="admin-btn"
+                onClick={function () {
+                  setIsDeleting(false);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            hasSavedContact && (
+              <button
+                type="button"
+                className="admin-btn admin-btn-danger"
+                onClick={function () {
+                  setIsDeleting(true);
+                }}
+                disabled={saving || deleting}
+              >
+                <Trash2 size={16} /> Delete Contact Info
+              </button>
+            )
+          )}
         </div>
       </form>
 

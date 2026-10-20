@@ -1,9 +1,10 @@
 // src/pages/Home.jsx
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Video, Users, Eye } from "lucide-react";
+import { Video, Eye, ChevronLeft, ChevronRight, ImageIcon } from "lucide-react";
 
 import HeroBanner from "../components/HeroBanner.jsx";
+
 import SectionTitle from "../components/SectionTitle.jsx";
 import Announcement from "../components/Announcement.jsx";
 import EventCard from "../components/EventCard.jsx";
@@ -11,9 +12,7 @@ import FestivalCard from "../components/FestivalCard.jsx";
 import JoinCTA from "../components/JoinCTA.jsx";
 import { apiGet, apiPost } from "../api.js";
 
-// Put the real committee group photo path or link here,
-// for example "/images/committee-group.jpg" (file inside the public/images folder).
-const groupPhotoUrl = "";
+const EVENT_CAROUSEL_INTERVAL = 4000; // 4 seconds
 
 const VISIT_KEY = "cta_visit_recorded";
 
@@ -41,6 +40,12 @@ function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Admin Files photo carousel state
+  const [fileImages, setFileImages] = useState([]);
+  const [carouselIndex, setCarouselIndex] = useState(0);
+  const [carouselPaused, setCarouselPaused] = useState(false);
+
+
   // Load everything for the page. Each request is independent, so one
   // failing request does not stop the others from showing.
   useEffect(function loadHomeData() {
@@ -53,6 +58,7 @@ function Home() {
         apiGet("/events"),
         apiGet("/festivals"),
         apiGet("/contact"),
+        apiGet("/files?type=image"),
       ]);
 
       if (isCancelled) {
@@ -95,7 +101,15 @@ function Home() {
         setYoutubeUrl(results[4].value.data.youtubeUrl || "");
       }
 
-      const allFailed = results.every(function (item) {
+      if (results[5].status === "fulfilled") {
+        // Only images uploaded through Admin -> Files
+        var images = (results[5].value.data || []).filter(function (item) {
+          return item.fileType === "image" && item.fileUrl && item.fileUrl.trim() !== "";
+        });
+        setFileImages(images);
+      }
+
+      var allFailed = results.every(function (item) {
         return item.status === "rejected";
       });
 
@@ -105,7 +119,6 @@ function Home() {
 
       setLoading(false);
     }
-
     fetchAll();
 
     return function cleanup() {
@@ -155,21 +168,137 @@ function Home() {
     );
   }
 
-  let groupPhoto = (
-    <div className="group-photo group-photo-placeholder">
-      <Users size={48} aria-hidden="true" />
-      <p>The current committee group photograph will appear here.</p>
-    </div>
+  // Admin Files carousel: auto-advance every 4 seconds
+  useEffect(
+    function startFileCarousel() {
+      if (fileImages.length < 2 || carouselPaused) {
+        return;
+      }
+
+      var timerId = setInterval(function () {
+        setCarouselIndex(function (prev) {
+          return (prev + 1) % fileImages.length;
+        });
+      }, EVENT_CAROUSEL_INTERVAL);
+
+      return function stopFileCarousel() {
+        clearInterval(timerId);
+      };
+    },
+    [fileImages.length, carouselPaused]
   );
 
-  if (groupPhotoUrl) {
-    groupPhoto = (
-      <img
-        className="group-photo"
-        src={groupPhotoUrl}
-        alt="Current CTA committee"
-        loading="lazy"
-      />
+  // Keep carousel index valid if file data changes
+  useEffect(
+    function resetCarouselIndex() {
+      if (carouselIndex >= fileImages.length) {
+        setCarouselIndex(0);
+      }
+    },
+    [fileImages.length, carouselIndex]
+  );
+
+  function goToNextSlide() {
+    setCarouselIndex(function (prev) {
+      return (prev + 1) % fileImages.length;
+    });
+  }
+
+  function goToPrevSlide() {
+    setCarouselIndex(function (prev) {
+      return (prev - 1 + fileImages.length) % fileImages.length;
+    });
+  }
+
+  // Build carousel content exclusively from Admin Files images
+  var carouselContent = null;
+  if (loading) {
+    carouselContent = (
+      <div className="event-carousel-empty">
+        <p className="loading-state">Loading images...</p>
+      </div>
+    );
+  } else if (fileImages.length === 0) {
+    carouselContent = (
+      <div className="event-carousel-empty">
+        <ImageIcon size={48} aria-hidden="true" />
+        <p>No photos uploaded yet in Admin &rarr; Files.</p>
+      </div>
+    );
+  } else {
+    var showCarouselControls = fileImages.length > 1;
+
+    carouselContent = (
+      <div
+        className="event-carousel"
+        aria-roledescription="carousel"
+        aria-label="Community photos"
+        onMouseEnter={function () { setCarouselPaused(true); }}
+        onMouseLeave={function () { setCarouselPaused(false); }}
+      >
+        {fileImages.map(function (item, index) {
+          var slideClass = "event-carousel-slide";
+          if (index === carouselIndex) {
+            slideClass = "event-carousel-slide active";
+          }
+
+          return (
+            <div key={item._id || index} className={slideClass} aria-hidden={index !== carouselIndex}>
+              <img
+                className="event-carousel-img"
+                src={item.fileUrl}
+                alt={item.title || "Community photo"}
+                loading={index === 0 ? "eager" : "lazy"}
+              />
+              {item.title && (
+                <div className="event-carousel-overlay">
+                  <h3 className="event-carousel-title">{item.title}</h3>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {showCarouselControls && (
+          <>
+            <button
+              type="button"
+              className="event-carousel-arrow event-carousel-arrow-left"
+              aria-label="Previous photo"
+              onClick={goToPrevSlide}
+            >
+              <ChevronLeft size={24} />
+            </button>
+            <button
+              type="button"
+              className="event-carousel-arrow event-carousel-arrow-right"
+              aria-label="Next photo"
+              onClick={goToNextSlide}
+            >
+              <ChevronRight size={24} />
+            </button>
+
+            <div className="event-carousel-dots">
+              {fileImages.map(function (item, index) {
+                var dotClass = "event-carousel-dot";
+                if (index === carouselIndex) {
+                  dotClass = "event-carousel-dot active";
+                }
+
+                return (
+                  <button
+                    key={"fdot-" + index}
+                    type="button"
+                    className={dotClass}
+                    aria-label={"Go to photo " + (index + 1)}
+                    onClick={function () { setCarouselIndex(index); }}
+                  />
+                );
+              })}
+            </div>
+          </>
+        )}
+      </div>
     );
   }
 
@@ -270,19 +399,14 @@ function Home() {
         </div>
       </section>
 
-      {/* Current committee group photograph */}
+      {/* Community photo carousel - from Admin Files section */}
       <section className="section">
         <div className="container">
           <SectionTitle
-            title="Our Current Committee"
-            subtitle="The team serving our community"
+            title="Community Highlights"
+            subtitle="Moments and memories from our community"
           />
-          {groupPhoto}
-          <div className="text-center home-more">
-            <Link to="/committee" className="btn btn-outline">
-              Meet the Committee
-            </Link>
-          </div>
+          {carouselContent}
         </div>
       </section>
 

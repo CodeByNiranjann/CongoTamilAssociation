@@ -6,6 +6,7 @@ import {
   getContactInfo,
   saveContactInfo,
   sendMessage,
+  deleteContactInfo,
 } from "../controllers/contactController.js";
 import { protect } from "../middleware/authMiddleware.js";
 
@@ -31,5 +32,8 @@ router.post("/message", messageLimiter, sendMessage);
 
 // Admin only: create or update the contact details
 router.put("/", protect, saveContactInfo);
+
+// Admin only: delete the contact details
+router.delete("/", protect, deleteContactInfo);
 
 export default router;

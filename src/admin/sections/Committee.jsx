@@ -1,14 +1,18 @@
 // src/admin/sections/Committee.jsx
 import { useState, useEffect } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, User } from "lucide-react";
 
 import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
+import UploadField from "../UploadField.jsx";
 
 const emptyForm = {
   name: "",
   role: "",
   year: "",
   bio: "",
+  imageUrl: "",
+  imagePublicId: "",
+  order: 0,
 };
 
 function Committee() {
@@ -63,19 +67,20 @@ function Committee() {
   function validateForm() {
     const newErrors = {};
 
-    if (formData.name.trim() === "") {
+    if ((formData.name || "").trim() === "") {
       newErrors.name = "Name is required.";
     }
 
-    if (formData.role.trim() === "") {
+    if ((formData.role || "").trim() === "") {
       newErrors.role = "Role or designation is required.";
     }
 
-    if (/^\d{4}$/.test(formData.year.trim()) === false) {
-      newErrors.year = "Enter a 4-digit year, for example 2026.";
+    const cleanYear = (formData.year || "").trim();
+    if (!/^\d{4}(\s*[-–]\s*\d{4})?$/.test(cleanYear)) {
+      newErrors.year = "Enter a 4-digit year (e.g. 2026) or a term (e.g. 2026 - 2027).";
     }
 
-    if (formData.bio.length > 500) {
+    if ((formData.bio || "").length > 500) {
       newErrors.bio = "Bio must be 500 characters or fewer.";
     }
 
@@ -101,10 +106,13 @@ function Committee() {
     }
 
     const cleanData = {
-      name: formData.name.trim(),
-      role: formData.role.trim(),
-      year: formData.year.trim(),
-      bio: formData.bio.trim(),
+      name: (formData.name || "").trim(),
+      role: (formData.role || "").trim(),
+      year: (formData.year || "").trim(),
+      bio: (formData.bio || "").trim(),
+      imageUrl: (formData.imageUrl || "").trim(),
+      imagePublicId: (formData.imagePublicId || "").trim(),
+      order: Number(formData.order) || 0,
     };
 
     setSaving(true);
@@ -144,6 +152,9 @@ function Committee() {
       role: member.role,
       year: member.year,
       bio: member.bio || "",
+      imageUrl: member.imageUrl || "",
+      imagePublicId: member.imagePublicId || "",
+      order: member.order !== undefined ? member.order : 0,
     });
     setErrors({});
     setMessage("");
@@ -199,6 +210,7 @@ function Committee() {
       <table className="admin-table">
         <thead>
           <tr>
+            <th>Photo</th>
             <th>Name</th>
             <th>Role</th>
             <th>Year</th>
@@ -211,6 +223,19 @@ function Committee() {
 
             return (
               <tr key={member._id}>
+                <td>
+                  {member.imageUrl ? (
+                    <img
+                      src={member.imageUrl}
+                      alt={member.name}
+                      className="admin-table-avatar"
+                    />
+                  ) : (
+                    <div className="admin-table-avatar-placeholder">
+                      <User size={20} />
+                    </div>
+                  )}
+                </td>
                 <td>{member.name}</td>
                 <td>{member.role}</td>
                 <td>{member.year}</td>
@@ -288,6 +313,7 @@ function Committee() {
               id="committee-name"
               name="name"
               type="text"
+              placeholder="e.g. Mr. Prassanna"
               value={formData.name}
               onChange={handleChange}
               aria-invalid={errors.name ? "true" : "false"}
@@ -301,6 +327,7 @@ function Committee() {
               id="committee-role"
               name="role"
               type="text"
+              placeholder="e.g. President"
               value={formData.role}
               onChange={handleChange}
               aria-invalid={errors.role ? "true" : "false"}
@@ -309,21 +336,49 @@ function Committee() {
           </div>
 
           <div className="admin-field">
-            <label htmlFor="committee-year">Committee Year *</label>
+            <label htmlFor="committee-year">Committee Year / Term *</label>
             <input
               id="committee-year"
               name="year"
               type="text"
-              inputMode="numeric"
-              maxLength={4}
-              placeholder="2026"
+              maxLength={20}
+              placeholder="e.g. 2026 or 2026 - 2027"
               value={formData.year}
               onChange={handleChange}
               aria-invalid={errors.year ? "true" : "false"}
             />
             {errors.year && <span className="admin-error">{errors.year}</span>}
           </div>
+
+          <div className="admin-field">
+            <label htmlFor="committee-order">Display Order</label>
+            <input
+              id="committee-order"
+              name="order"
+              type="number"
+              min={0}
+              placeholder="0"
+              value={formData.order ?? 0}
+              onChange={handleChange}
+            />
+          </div>
         </div>
+
+        <UploadField
+          id="committee-photo"
+          label="Member photograph (shows in circular avatar)"
+          kind="image"
+          value={formData.imageUrl}
+          onChange={function (url, publicId) {
+            setFormData({
+              ...formData,
+              imageUrl: url,
+              imagePublicId:
+                publicId !== undefined ? publicId : formData.imagePublicId,
+            });
+          }}
+          error={errors.imageUrl}
+        />
 
         <div className="admin-field">
           <label htmlFor="committee-bio">Bio (optional)</label>

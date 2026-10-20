@@ -1,5 +1,6 @@
 // backend/controllers/anthemController.js
 import Anthem from "../models/Anthem.js";
+import { deleteFile } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -59,11 +60,54 @@ export async function saveAnthem(req, res, next) {
     if (!anthem) {
       anthem = await Anthem.create(data);
     } else {
+      if (
+        anthem.audioPublicId &&
+        data.audioPublicId &&
+        anthem.audioPublicId !== data.audioPublicId
+      ) {
+        try {
+          await deleteFile(anthem.audioPublicId, "video", "upload");
+        } catch (cleanupError) {
+          console.error("Could not remove previous anthem audio:", cleanupError.message);
+        }
+      }
       anthem.set(data);
       await anthem.save();
     }
 
     res.status(200).json({ success: true, data: anthem });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// DELETE /api/v1/anthem   (admin only)
+// Removes the anthem record and deletes any uploaded audio from Cloudinary
+export async function deleteAnthem(req, res, next) {
+  try {
+    const anthem = await Anthem.findOne();
+
+    if (!anthem) {
+      return res.status(200).json({
+        success: true,
+        message: "No anthem record to delete.",
+      });
+    }
+
+    if (anthem.audioPublicId) {
+      try {
+        await deleteFile(anthem.audioPublicId, "video", "upload");
+      } catch (cleanupError) {
+        console.error("Could not remove anthem audio from Cloudinary:", cleanupError.message);
+      }
+    }
+
+    await Anthem.deleteMany({});
+
+    res.status(200).json({
+      success: true,
+      message: "CTA Anthem deleted successfully.",
+    });
   } catch (error) {
     next(error);
   }

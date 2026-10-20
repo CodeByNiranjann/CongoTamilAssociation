@@ -1,21 +1,32 @@
 // src/components/CommitteeCard.jsx
+import { User } from "lucide-react";
 
-// Each committee member object looks like this (it will come from the admin dashboard later):
-// { _id, name, role, year, bio }
-
-function CommitteeCard(props) {
-  const member = props.member;
-
+// { _id, name, role, year, bio, imageUrl }
+function CommitteeCard({ member }) {
   return (
-    <article className="card committee-card">
-      <div className="card-body member-body">
-        <h3 className="member-name">{member.name}</h3>
+    <article className="committee-member-card">
+      <div className="committee-avatar-wrap">
+        {member.imageUrl ? (
+          <img
+            src={member.imageUrl}
+            alt={member.name}
+            className="committee-avatar"
+            loading="lazy"
+          />
+        ) : (
+          <div
+            className="committee-avatar-placeholder"
+            aria-label={member.name}
+          >
+            <User size={64} />
+          </div>
+        )}
+      </div>
 
-        {member.role && <p className="member-role">{member.role}</p>}
-
-        {member.year && <p className="member-year">{member.year}</p>}
-
-        {member.bio && <p className="member-bio">{member.bio}</p>}
+      <div className="committee-info">
+        <p className="committee-role">{member.role}</p>
+        <h3 className="committee-name">{member.name}</h3>
+        {member.bio && <p className="committee-bio">{member.bio}</p>}
       </div>
     </article>
   );

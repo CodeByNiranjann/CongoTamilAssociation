@@ -144,6 +144,7 @@ import byLawsRoutes from "./routes/byLawsRoutes.js";
 import contactRoutes from "./routes/contactRoutes.js";
 import visitorRoutes from "./routes/visitorRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import fileRoutes from "./routes/fileRoutes.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 
 const app = express();
@@ -206,6 +207,7 @@ app.use("/api/v1/by-laws", byLawsRoutes);
 app.use("/api/v1/contact", contactRoutes);
 app.use("/api/v1/visitors", visitorRoutes);
 app.use("/api/v1/uploads", uploadRoutes);
+app.use("/api/v1/files", fileRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -233,5 +235,4 @@ async function startServer() {
     process.exit(1);
   }
 }
-
-startServer();
+startServer();

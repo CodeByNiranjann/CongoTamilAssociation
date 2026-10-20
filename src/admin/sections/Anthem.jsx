@@ -1,14 +1,16 @@
 // src/admin/sections/Anthem.jsx
 import { useState, useEffect } from "react";
-import { Save } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 
-import { apiGet, apiPut } from "../../api.js";
+import { apiGet, apiPut, apiDelete } from "../../api.js";
 import UploadField from "../UploadField.jsx";
 
 const emptyAnthem = {
+  _id: "",
   title: "CTA Anthem",
   description: "",
   audioUrl: "",
+  audioPublicId: "",
 };
 
 function Anthem() {
@@ -17,6 +19,8 @@ function Anthem() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const [serverError, setServerError] = useState("");
@@ -28,9 +32,11 @@ function Anthem() {
       try {
         const result = await apiGet("/anthem");
         const loaded = {
+          _id: result.data._id || "",
           title: result.data.title || "CTA Anthem",
           description: result.data.description || "",
           audioUrl: result.data.audioUrl || "",
+          audioPublicId: result.data.audioPublicId || "",
         };
 
         if (isCancelled === false) {
@@ -106,14 +112,17 @@ function Anthem() {
           title: formData.title.trim(),
           description: formData.description.trim(),
           audioUrl: formData.audioUrl.trim(),
+          audioPublicId: formData.audioPublicId || "",
         },
         true
       );
 
       const saved = {
-        title: result.data.title,
+        _id: result.data._id || "",
+        title: result.data.title || "CTA Anthem",
         description: result.data.description || "",
         audioUrl: result.data.audioUrl || "",
+        audioPublicId: result.data.audioPublicId || "",
       };
       setSavedAnthem(saved);
       setFormData(saved);
@@ -130,6 +139,27 @@ function Anthem() {
     setErrors({});
     setMessage("");
     setServerError("");
+    setIsDeleting(false);
+  }
+
+  async function handleDelete() {
+    setMessage("");
+    setServerError("");
+    setDeleting(true);
+
+    try {
+      await apiDelete("/anthem", true);
+
+      setSavedAnthem(emptyAnthem);
+      setFormData(emptyAnthem);
+      setErrors({});
+      setMessage("Anthem deleted successfully.");
+    } catch (err) {
+      setServerError(err.message || "Failed to delete anthem.");
+    } finally {
+      setDeleting(false);
+      setIsDeleting(false);
+    }
   }
 
   if (loading) {
@@ -144,6 +174,10 @@ function Anthem() {
   if (saving) {
     buttonText = "Saving...";
   }
+
+  const hasSavedAnthem = Boolean(
+    savedAnthem._id || savedAnthem.audioUrl || savedAnthem.description
+  );
 
   return (
     <div className="admin-section">
@@ -189,19 +223,70 @@ function Anthem() {
           label="Anthem audio (MP3 or WAV)"
           kind="audio"
           value={formData.audioUrl}
-          onChange={function (url) {
-            setFormData({ ...formData, audioUrl: url });
+          onChange={function (url, publicId) {
+            setFormData({
+              ...formData,
+              audioUrl: url,
+              audioPublicId:
+                publicId !== undefined ? publicId : formData.audioPublicId,
+            });
           }}
           error={errors.audioUrl}
         />
 
         <div className="admin-form-actions">
-          <button type="submit" className="btn btn-primary" disabled={saving}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={saving || deleting}
+          >
             <Save size={18} /> {buttonText}
           </button>
-          <button type="button" className="btn btn-outline" onClick={handleReset}>
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={handleReset}
+            disabled={saving || deleting}
+          >
             Undo Changes
           </button>
+
+          {isDeleting ? (
+            <div className="admin-confirm">
+              <span>Delete this anthem?</span>
+              <button
+                type="button"
+                className="admin-btn admin-btn-danger"
+                onClick={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Yes, delete"}
+              </button>
+              <button
+                type="button"
+                className="admin-btn"
+                onClick={function () {
+                  setIsDeleting(false);
+                }}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            hasSavedAnthem && (
+              <button
+                type="button"
+                className="admin-btn admin-btn-danger"
+                onClick={function () {
+                  setIsDeleting(true);
+                }}
+                disabled={saving || deleting}
+              >
+                <Trash2 size={16} /> Delete Anthem
+              </button>
+            )
+          )}
         </div>
       </form>
     </div>

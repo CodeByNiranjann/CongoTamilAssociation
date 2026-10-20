@@ -1,10 +1,10 @@
 // src/admin/UploadField.jsx
 import { useState } from "react";
-import { Upload } from "lucide-react";
+import { Upload, Trash2 } from "lucide-react";
 
 import { apiPost } from "../api.js";
 
-// Props: id, label, kind ("image" | "audio" | "pdf"), value, onChange(url),
+// Props: id, label, kind ("image" | "audio" | "pdf"), value, onChange(url, publicId),
 //        error (text), showLink (default true: shows the link box too)
 
 const acceptTypes = {
@@ -50,7 +50,7 @@ function UploadField(props) {
 
     try {
       const result = await apiPost("/uploads/" + kind, body, true);
-      props.onChange(result.url);
+      props.onChange(result.url, result.publicId);
     } catch (err) {
       setUploadError(err.message);
     } finally {
@@ -118,6 +118,18 @@ function UploadField(props) {
             disabled={uploading}
           />
         </label>
+        {value && (
+          <button
+            type="button"
+            className="admin-btn admin-btn-danger"
+            onClick={function () {
+              props.onChange("", "");
+            }}
+            title="Remove current file"
+          >
+            <Trash2 size={16} /> Remove file
+          </button>
+        )}
         <span className="admin-hint">Max {maxSizesMB[kind]} MB</span>
       </div>
 
