@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Save, Plus, Trash2, Pencil, ArrowUp, ArrowDown } from "lucide-react";
 
-import { apiGet, apiPut } from "../../api.js";
+import { apiGet, apiPut, apiDelete } from "../../api.js";
 import UploadField from "../UploadField.jsx";
 
 const emptySectionForm = {
@@ -18,6 +18,7 @@ function ByLaws() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const [serverError, setServerError] = useState("");
   const [infoErrors, setInfoErrors] = useState({});
@@ -25,7 +26,11 @@ function ByLaws() {
   const [sectionForm, setSectionForm] = useState(emptySectionForm);
   const [editingIndex, setEditingIndex] = useState(-1);
   const [sectionErrors, setSectionErrors] = useState({});
+
+  // Individual rule: show confirm row in table (local state only — must Save to persist)
   const [deleteIndex, setDeleteIndex] = useState(-1);
+  // Whole record: show confirm UI next to Save button
+  const [confirmingDeleteAll, setConfirmingDeleteAll] = useState(false);
 
   useEffect(function loadByLaws() {
     let isCancelled = false;
@@ -149,7 +154,9 @@ function ByLaws() {
     setMessage("Rule list changed. Click Save By-Laws to keep your changes.");
   }
 
-  function confirmDelete(index) {
+  // Removes a single rule from local state only.
+  // Nothing is sent to the server until the admin clicks "Save By-Laws".
+  function confirmDeleteRule(index) {
     setSections(
       sections.filter(function (item, itemIndex) {
         return itemIndex !== index;
@@ -157,7 +164,31 @@ function ByLaws() {
     );
     setDeleteIndex(-1);
     resetSectionForm();
-    setMessage("Rule list changed. Click Save By-Laws to keep your changes.");
+    setMessage("Rule removed. Click Save By-Laws to persist this change.");
+  }
+
+  // Permanently deletes the entire By-Laws record from MongoDB via DELETE /api/v1/by-laws.
+  // After this the public page returns the empty-defaults response from getByLaws.
+  async function handleDeleteAll() {
+    setMessage("");
+    setServerError("");
+    setDeleting(true);
+
+    try {
+      await apiDelete("/by-laws", true);
+
+      // Reset all local state to match the now-empty server record
+      setIntro("");
+      setPdfUrl("");
+      setSections([]);
+      resetSectionForm();
+      setConfirmingDeleteAll(false);
+      setMessage("By-laws deleted successfully.");
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleSave() {
@@ -190,6 +221,9 @@ function ByLaws() {
         true
       );
 
+      // Sync all fields back from server (server may trim / clean values)
+      setIntro(result.data.intro || "");
+      setPdfUrl(result.data.pdfUrl || "");
       setSections(
         result.data.sections.map(function (item) {
           return { heading: item.heading, text: item.text };
@@ -366,10 +400,10 @@ function ByLaws() {
                             type="button"
                             className="admin-btn admin-btn-danger"
                             onClick={function () {
-                              confirmDelete(index);
+                              confirmDeleteRule(index);
                             }}
                           >
-                            Yes, delete
+                            Yes, remove
                           </button>
                           <button
                             type="button"
@@ -418,11 +452,50 @@ function ByLaws() {
         <button
           type="button"
           className="btn btn-primary"
-          disabled={saving}
+          disabled={saving || deleting}
           onClick={handleSave}
         >
           <Save size={18} /> {saveText}
         </button>
+
+        {confirmingDeleteAll ? (
+          <>
+            <span style={{ alignSelf: "center", fontSize: "0.9rem" }}>
+              Permanently delete all by-laws?
+            </span>
+            <button
+              type="button"
+              className="admin-btn admin-btn-danger"
+              disabled={deleting}
+              onClick={handleDeleteAll}
+            >
+              {deleting ? "Deleting..." : "Yes, delete all"}
+            </button>
+            <button
+              type="button"
+              className="admin-btn"
+              disabled={deleting}
+              onClick={function () {
+                setConfirmingDeleteAll(false);
+              }}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          (intro !== "" || pdfUrl !== "" || sections.length > 0) && (
+            <button
+              type="button"
+              className="admin-btn admin-btn-danger"
+              disabled={saving || deleting}
+              onClick={function () {
+                setConfirmingDeleteAll(true);
+              }}
+            >
+              <Trash2 size={16} /> Delete All By-Laws
+            </button>
+          )
+        )}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import express from "express";
 import {
   getInfo,
   saveInfo,
+  deleteInfo,
   getPublicDocuments,
   getAllDocuments,
   createDocument,
@@ -17,6 +18,7 @@ const router = express.Router();
 // Information (single record)
 router.get("/", getInfo);
 router.put("/", protect, saveInfo);
+router.delete("/", protect, deleteInfo);
 
 // Documents. The fixed path "/documents/admin" must come before "/documents/:id".
 router.get("/documents", getPublicDocuments);

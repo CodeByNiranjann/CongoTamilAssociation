@@ -118,6 +118,26 @@ export async function saveInfo(req, res, next) {
   }
 }
 
+// DELETE /api/v1/africa-tamil-charal   (admin only)
+// Clears the introduction text and images list from the single info record.
+export async function deleteInfo(req, res, next) {
+  try {
+    let info = await AfricaTamilCharalInfo.findOne();
+
+    if (!info) {
+      return res.status(200).json({ success: true, message: "Nothing to delete." });
+    }
+
+    info.introduction = "";
+    info.images = [];
+    await info.save();
+
+    res.status(200).json({ success: true, message: "Information deleted." });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // ---------- Documents (many records) ----------
 
 // GET /api/v1/africa-tamil-charal/documents   (public)

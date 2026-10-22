@@ -30,6 +30,7 @@ function AfricaTamilCharal() {
   const [infoSaving, setInfoSaving] = useState(false);
   const [infoErrors, setInfoErrors] = useState({});
   const [infoMessage, setInfoMessage] = useState("");
+  const [confirmingInfoDelete, setConfirmingInfoDelete] = useState(false);
 
   // ----- Documents -----
   const [documents, setDocuments] = useState([]);
@@ -123,6 +124,23 @@ function AfricaTamilCharal() {
       setServerError(err.message);
     } finally {
       setInfoSaving(false);
+    }
+  }
+
+  async function handleDeleteInfo() {
+    setInfoMessage("");
+    setServerError("");
+    setInfoSaving(true);
+    try {
+      await apiDelete("/africa-tamil-charal", true);
+      setIntroduction("");
+      setImagesText("");
+      setInfoMessage("Information deleted.");
+    } catch (err) {
+      setServerError(err.message);
+    } finally {
+      setInfoSaving(false);
+      setConfirmingInfoDelete(false);
     }
   }
 
@@ -354,6 +372,42 @@ function AfricaTamilCharal() {
           <button type="submit" className="btn btn-primary" disabled={infoSaving}>
             <Save size={18} /> {infoButtonText}
           </button>
+
+          {confirmingInfoDelete ? (
+            <>
+              <span style={{ alignSelf: "center", fontSize: "0.9rem" }}>
+                Delete all information?
+              </span>
+              <button
+                type="button"
+                className="admin-btn admin-btn-danger"
+                disabled={infoSaving}
+                onClick={handleDeleteInfo}
+              >
+                Yes, delete
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={function () {
+                  setConfirmingInfoDelete(false);
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={infoSaving}
+              onClick={function () {
+                setConfirmingInfoDelete(true);
+              }}
+            >
+              <Trash2 size={18} /> Delete Information
+            </button>
+          )}
         </div>
       </form>
 

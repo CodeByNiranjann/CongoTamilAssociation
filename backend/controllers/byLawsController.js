@@ -105,3 +105,16 @@ export async function saveByLaws(req, res, next) {
     next(error);
   }
 }
+
+// DELETE /api/v1/by-laws   (admin only)
+// Permanently removes the entire by-laws record from the database.
+// The public page will then return the empty-defaults response from getByLaws.
+export async function deleteByLaws(req, res, next) {
+  try {
+    await ByLaws.deleteOne({});
+
+    res.status(200).json({ success: true, message: "By-laws deleted." });
+  } catch (error) {
+    next(error);
+  }
+}
