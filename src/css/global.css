@@ -1,36 +1,37 @@
 /* ==========================================================================
    Global Styles — Congo Tamil Association
-   Foundation design tokens, resets, layout helpers, and shared components.
+   Pristine White Professional Theme: Clean white surfaces, subtle slate
+   accents, crisp typography, and modern neutral elevations.
    ========================================================================== */
 
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap");
 
 /* ---------- Design Tokens ---------- */
 :root {
-  /* Primary — a richer, deeper burgundy with subtle warmth */
-  --color-primary: #6b1d2a;
-  --color-primary-dark: #491220;
-  --color-primary-soft: #f5eaed;
+  /* Primary — distinguished rich burgundy */
+  --color-primary: #7a1526;
+  --color-primary-dark: #4d0a16;
+  --color-primary-soft: #fdf2f4;
 
-  /* Accent — warm antique gold, sophisticated and understated */
-  --color-accent: #c99a2e;
-  --color-accent-dark: #a17b1a;
+  /* Accent — refined noble gold */
+  --color-accent: #c48b11;
+  --color-accent-dark: #9e6d0a;
 
-  /* Surfaces & backgrounds */
-  --color-bg: #faf7f2;
+  /* Surfaces & backgrounds — Crisp White Theme */
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-cream: #f5eedf;
+  --color-cream: #f8fafc; /* Clean cool-white soft section contrast */
 
-  /* Text hierarchy */
-  --color-text: #2a2220;
-  --color-muted: #7a6e66;
+  /* Text hierarchy — High-contrast modern slate */
+  --color-text: #0f172a;
+  --color-muted: #64748b;
 
-  /* Borders & dividers */
-  --color-border: #e6dace;
+  /* Borders & dividers — Subtle clean border */
+  --color-border: #e2e8f0;
 
   /* Semantic colors */
-  --color-success: #1a7a42;
-  --color-error: #b52a22;
+  --color-success: #15803d;
+  --color-error: #dc2626;
 
   /* Typography */
   --font-body: "Inter", "Segoe UI", Roboto, Arial, sans-serif;
@@ -40,16 +41,16 @@
   --radius: 10px;
   --radius-lg: 14px;
 
-  /* Elevation — multi-layered shadows for realistic depth */
+  /* Elevation — Crisp neutral modern shadows */
   --shadow-sm:
-    0 1px 2px rgba(73, 18, 32, 0.06),
-    0 4px 12px rgba(73, 18, 32, 0.04);
+    0 1px 3px rgba(15, 23, 42, 0.06),
+    0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-md:
-    0 2px 4px rgba(73, 18, 32, 0.05),
-    0 8px 24px rgba(73, 18, 32, 0.1);
+    0 4px 12px rgba(15, 23, 42, 0.07),
+    0 2px 4px rgba(15, 23, 42, 0.04);
   --shadow-lg:
-    0 4px 8px rgba(73, 18, 32, 0.06),
-    0 16px 48px rgba(73, 18, 32, 0.12);
+    0 12px 32px rgba(15, 23, 42, 0.09),
+    0 4px 8px rgba(15, 23, 42, 0.04);
 
   /* Motion */
   --transition: 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -90,8 +91,8 @@ h3,
 h4 {
   font-family: var(--font-heading);
   color: var(--color-primary);
-  line-height: 1.2;
-  letter-spacing: -0.01em;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
   margin: 0 0 0.65em;
 }
 
@@ -112,11 +113,16 @@ h4 {
 }
 
 p {
-  margin: 0 0 1em;
+  margin: 0 0 1.1em;
+}
+
+p:last-child {
+  margin-bottom: 0;
 }
 
 img {
   max-width: 100%;
+  height: auto;
   display: block;
 }
 
@@ -138,7 +144,7 @@ ul {
 
 ::selection {
   background: var(--color-accent);
-  color: #fff;
+  color: #ffffff;
 }
 
 /* ---------- Accessibility ---------- */
@@ -153,16 +159,19 @@ ul {
   left: -9999px;
   top: 0;
   z-index: 1000;
-  padding: 0.65rem 1.2rem;
+  padding: 0.65rem 1.25rem;
   background: var(--color-primary);
-  color: #fff;
+  color: #ffffff;
   font-weight: 600;
   font-size: 0.9rem;
-  border-radius: 0 0 var(--radius) var(--radius);
+  border-bottom-right-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  transition: top var(--transition);
 }
 
 .skip-link:focus {
   left: 0;
+  top: 0;
 }
 
 /* ---------- Layout Helpers ---------- */
@@ -179,19 +188,21 @@ ul {
 
 .section-alt {
   background: var(--color-cream);
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .grid {
   display: grid;
-  gap: 1.75rem;
+  gap: 2rem;
 }
 
 .grid-2 {
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
 .grid-3 {
-  grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .text-center {
@@ -203,126 +214,133 @@ ul {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.7rem 1.75rem;
-  border: 2px solid transparent;
+  gap: 0.55rem;
+  padding: 0.72rem 1.75rem;
+  border: 1.5px solid transparent;
   border-radius: 999px;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.015em;
   cursor: pointer;
-  transition:
-    background var(--transition),
-    color var(--transition),
-    border-color var(--transition),
-    box-shadow var(--transition),
-    transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  box-shadow: var(--shadow-sm);
+  transition: all var(--transition);
+  text-decoration: none;
 }
 
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .btn:active {
   transform: translateY(0);
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary {
   background: var(--color-primary);
-  color: #fff;
+  color: #ffffff;
+  border-color: var(--color-primary);
 }
 
 .btn-primary:hover {
   background: var(--color-primary-dark);
-  color: #fff;
-  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-dark);
+  color: #ffffff;
 }
 
 .btn-accent {
   background: var(--color-accent);
-  color: #fff;
+  color: #ffffff;
+  border-color: var(--color-accent);
+  font-weight: 600;
 }
 
 .btn-accent:hover {
   background: var(--color-accent-dark);
-  color: #fff;
-  box-shadow: var(--shadow-md);
+  border-color: var(--color-accent-dark);
+  color: #ffffff;
 }
 
 .btn-outline {
-  background: transparent;
+  background: #ffffff;
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
 
 .btn-outline:hover {
   background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
+  color: #ffffff;
 }
 
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-  filter: grayscale(0.2);
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* ---------- Status Messages ---------- */
 .alert {
-  padding: 0.85rem 1.15rem;
-  margin-bottom: 1rem;
+  padding: 0.95rem 1.25rem;
+  margin-bottom: 1.25rem;
   border-radius: var(--radius);
-  border-left: 4px solid transparent;
-  font-size: 0.925rem;
+  border: 1px solid transparent;
+  border-left-width: 4px;
+  font-size: 0.95rem;
   line-height: 1.55;
+  box-shadow: var(--shadow-sm);
 }
 
 .alert-success {
-  background: #e8f5ee;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
   border-left-color: var(--color-success);
-  color: #156033;
+  color: #166534;
 }
 
 .alert-error {
-  background: #fdeceb;
+  background: #fef2f2;
+  border-color: #fecaca;
   border-left-color: var(--color-error);
-  color: #8c1d17;
+  color: #991b1b;
 }
 
-/* ---------- Empty & Loading States ---------- */
 .empty-state,
 .loading-state {
-  padding: 3rem 1.5rem;
+  padding: 3.5rem 1.5rem;
   text-align: center;
   color: var(--color-muted);
-  background: var(--color-surface);
+  background: #ffffff;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-lg);
-  font-size: 0.95rem;
-  line-height: 1.6;
+  font-size: 1rem;
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- Responsive ---------- */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .section {
-    padding: 3.25rem 0;
+    padding: 3.75rem 0;
   }
 
   .container {
-    padding: 0 1.15rem;
+    padding: 0 1.25rem;
+  }
+
+  .grid {
+    gap: 1.5rem;
   }
 }
 
-/* ---------- Reduced Motion ---------- */
 @media (prefers-reduced-motion: reduce) {
-  * {
-    transition: none !important;
-    animation: none !important;
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     scroll-behavior: auto !important;
   }
 }

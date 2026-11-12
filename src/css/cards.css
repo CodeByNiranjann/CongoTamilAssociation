@@ -40,10 +40,10 @@
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: var(--color-cream);
+  background: var(--color-primary-soft);
   color: var(--color-primary);
-  border: 1px solid rgba(201, 154, 46, 0.25);
-  box-shadow: 0 1px 4px rgba(73, 18, 32, 0.05);
+  border: 1px solid rgba(122, 21, 38, 0.15);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
 }
 
 .announcement-body {
@@ -113,7 +113,7 @@
 .card-image-wrap {
   position: relative;
   overflow: hidden;
-  background: var(--color-cream);
+  background: #f8fafc;
 }
 
 .card-image {
@@ -131,7 +131,7 @@
   display: grid;
   place-items: center;
   height: 220px;
-  background: linear-gradient(135deg, var(--color-cream) 0%, #ebe0cd 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
   color: var(--color-primary);
 }
 
@@ -287,7 +287,7 @@
   justify-content: center;
   align-items: center;
   padding: 2rem 1.5rem 1.25rem;
-  background: linear-gradient(180deg, var(--color-cream) 0%, #ede3d2 100%);
+  background: linear-gradient(180deg, #f8fafc 0%, #edf2f7 100%);
   position: relative;
 }
 
@@ -298,16 +298,16 @@
   object-fit: cover;
   border-radius: 6px;
   box-shadow:
-    0 10px 24px rgba(73, 18, 32, 0.22),
-    0 2px 6px rgba(0, 0, 0, 0.08);
+    0 10px 24px rgba(15, 23, 42, 0.14),
+    0 2px 6px rgba(0, 0, 0, 0.06);
   transition: transform var(--transition), box-shadow var(--transition);
 }
 
 .card:hover .publication-cover {
   transform: translateY(-4px);
   box-shadow:
-    0 14px 32px rgba(73, 18, 32, 0.28),
-    0 4px 10px rgba(0, 0, 0, 0.1);
+    0 14px 32px rgba(15, 23, 42, 0.2),
+    0 4px 10px rgba(0, 0, 0, 0.08);
 }
 
 .publication-cover-placeholder {
@@ -316,7 +316,7 @@
   width: 100%;
   max-width: 210px;
   height: 285px;
-  background: #f0e6d5;
+  background: #f1f5f9;
   color: var(--color-primary);
   border-radius: 6px;
   border: 1px dashed var(--color-border);
@@ -346,9 +346,9 @@
   padding: 4px;
   background: #ffffff;
   box-shadow:
-    0 4px 16px rgba(73, 18, 32, 0.08),
-    0 1px 4px rgba(0, 0, 0, 0.04);
-  border: 1px solid var(--color-border);
+    0 4px 16px rgba(15, 23, 42, 0.06),
+    0 1px 4px rgba(0, 0, 0, 0.03);
+  border: 1.5px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -357,8 +357,8 @@
 
 .committee-member-card:hover .committee-avatar-wrap {
   box-shadow:
-    0 8px 26px rgba(201, 154, 46, 0.28),
-    0 2px 8px rgba(73, 18, 32, 0.12);
+    0 8px 24px rgba(196, 139, 17, 0.22),
+    0 2px 8px rgba(15, 23, 42, 0.08);
   border-color: var(--color-accent);
 }
 
@@ -374,7 +374,7 @@
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  background: linear-gradient(135deg, #fbf7ee 0%, #f2e7d3 100%);
+  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%);
   color: var(--color-accent-dark);
   display: flex;
   align-items: center;

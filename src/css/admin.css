@@ -122,7 +122,7 @@
 }
 
 .admin-table th {
-  background: #f7f1e6;
+  background: #f8fafc;
   color: var(--color-primary);
   font-size: 0.82rem;
   font-weight: 700;
@@ -136,7 +136,7 @@
 }
 
 .admin-table tbody tr:hover {
-  background: #fdfbf7;
+  background: #f8fafc;
 }
 
 .admin-table tbody tr:last-child td {
@@ -264,7 +264,7 @@
 .admin-layout {
   display: flex;
   min-height: 100vh;
-  background: #f7f3eb;
+  background: #f8fafc;
 }
 
 .admin-sidebar {
@@ -277,7 +277,7 @@
   flex-direction: column;
   width: 260px;
   background: linear-gradient(180deg, var(--color-primary-dark) 0%, #350b12 60%, #26070d 100%);
-  color: #f7eedf;
+  color: #f1f5f9;
   overflow-y: auto;
   box-shadow: 2px 0 16px rgba(0, 0, 0, 0.2);
 }
@@ -305,7 +305,7 @@
   height: 36px;
   border: none;
   background: none;
-  color: #f7eedf;
+  color: #f1f5f9;
   cursor: pointer;
 }
 

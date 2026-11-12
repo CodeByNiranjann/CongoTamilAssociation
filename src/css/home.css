@@ -74,7 +74,7 @@
   margin-bottom: 2rem;
   font-size: clamp(1.05rem, 2vw, 1.22rem);
   line-height: 1.65;
-  color: #f7eedf;
+  color: #f1f5f9;
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35);
   font-weight: 400;
 }
@@ -414,7 +414,7 @@
 
 .join-cta-text {
   margin: 0;
-  color: #f7eedf;
+  color: #f1f5f9;
   font-size: 1.05rem;
   line-height: 1.6;
 }

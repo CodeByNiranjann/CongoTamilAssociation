@@ -84,7 +84,7 @@
 .page-header-text {
   max-width: 720px;
   margin: 0 auto;
-  color: #f7eedf;
+  color: #f1f5f9;
   font-size: 1.12rem;
   line-height: 1.65;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.3);
@@ -181,9 +181,9 @@
   height: 58px;
   margin-bottom: 1.25rem;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-cream) 0%, #eee1cb 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
   color: var(--color-primary);
-  border: 1px solid rgba(201, 154, 46, 0.35);
+  border: 1.5px solid var(--color-border);
   box-shadow: var(--shadow-sm);
 }
 

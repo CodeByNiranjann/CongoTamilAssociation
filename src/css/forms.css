@@ -81,8 +81,8 @@
 }
 
 .notification-info {
-  background: var(--color-cream);
-  border-color: rgba(201, 154, 46, 0.3);
+  background: #f8fafc;
+  border-color: #cbd5e1;
   border-left-color: var(--color-accent);
   color: var(--color-primary);
 }
