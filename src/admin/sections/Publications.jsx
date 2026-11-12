@@ -21,6 +21,7 @@ const emptyForm = {
   year: "",
   description: "",
   coverImageUrl: "",
+  coverImagePublicId: "",
   pdfLink: "",
   isPublished: true,
 };
@@ -167,6 +168,9 @@ function Publications() {
       year: formData.year.trim(),
       description: formData.description.trim(),
       coverImageUrl: formData.coverImageUrl.trim(),
+      coverImagePublicId: formData.coverImagePublicId
+        ? formData.coverImagePublicId.trim()
+        : "",
       pdfLink: formData.pdfLink.trim(),
       section: section,
       isPublished: formData.isPublished,
@@ -208,6 +212,7 @@ function Publications() {
       year: String(item.year),
       description: item.description || "",
       coverImageUrl: item.coverImageUrl || "",
+      coverImagePublicId: item.coverImagePublicId || "",
       pdfLink: item.pdfLink || "",
       isPublished: item.isPublished,
     });
@@ -470,8 +475,13 @@ function Publications() {
           label="Cover image"
           kind="image"
           value={formData.coverImageUrl}
-          onChange={function (url) {
-            setFormData({ ...formData, coverImageUrl: url });
+          onChange={function (url, publicId) {
+            setFormData({
+              ...formData,
+              coverImageUrl: url,
+              coverImagePublicId:
+                publicId || (url ? formData.coverImagePublicId : ""),
+            });
           }}
           error={errors.coverImageUrl}
         />

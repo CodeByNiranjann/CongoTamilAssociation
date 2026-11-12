@@ -1,5 +1,6 @@
 // backend/controllers/bannerController.js
 import Banner from "../models/Banner.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -90,14 +91,26 @@ export async function updateBanner(req, res, next) {
   try {
     const data = pickBannerFields(req.body);
 
-    const banner = await Banner.findByIdAndUpdate(req.params.id, data, {
-      new: true,
-      runValidators: true,
-    });
+    const banner = await Banner.findById(req.params.id);
 
     if (!banner) {
       return next(createError("Banner not found.", 404));
     }
+
+    const imageChanged =
+      (data.imagePublicId && data.imagePublicId !== banner.imagePublicId) ||
+      (data.imageUrl && data.imageUrl !== banner.imageUrl);
+
+    if (imageChanged) {
+      await deleteCloudinaryAsset(
+        banner.imagePublicId || banner.imageUrl,
+        "image",
+        "upload"
+      );
+    }
+
+    banner.set(data);
+    await banner.save();
 
     res.status(200).json({ success: true, data: banner });
   } catch (error) {
@@ -145,11 +158,19 @@ export async function reorderBanners(req, res, next) {
 // DELETE /api/v1/banners/:id   (admin only)
 export async function deleteBanner(req, res, next) {
   try {
-    const banner = await Banner.findByIdAndDelete(req.params.id);
+    const banner = await Banner.findById(req.params.id);
 
     if (!banner) {
       return next(createError("Banner not found.", 404));
     }
+
+    await deleteCloudinaryAsset(
+      banner.imagePublicId || banner.imageUrl,
+      "image",
+      "upload"
+    );
+
+    await banner.deleteOne();
 
     res.status(200).json({ success: true, message: "Banner deleted." });
   } catch (error) {

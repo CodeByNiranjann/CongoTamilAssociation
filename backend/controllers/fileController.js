@@ -1,6 +1,6 @@
 // backend/controllers/fileController.js
 import File from "../models/File.js";
-import { deleteFile } from "../utils/cloudinary.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 function createError(message, statusCode) {
   const error = new Error(message);
@@ -121,14 +121,22 @@ export async function updateFile(req, res, next) {
       return next(createError("File record not found.", 404));
     }
 
-    // If publicId changed, delete old Cloudinary asset safely
-    if (data.publicId && existing.publicId && data.publicId !== existing.publicId) {
-      try {
-        const resourceType = existing.fileType === "audio" ? "video" : existing.fileType === "image" ? "image" : "raw";
-        await deleteFile(existing.publicId, resourceType, "upload");
-      } catch (err) {
-        // Silently continue if Cloudinary delete fails
-      }
+    const fileChanged =
+      (data.publicId && existing.publicId && data.publicId !== existing.publicId) ||
+      (data.fileUrl && data.fileUrl !== existing.fileUrl);
+
+    if (fileChanged) {
+      const resourceType =
+        existing.fileType === "audio"
+          ? "video"
+          : existing.fileType === "image"
+          ? "image"
+          : "raw";
+      await deleteCloudinaryAsset(
+        existing.publicId || existing.fileUrl,
+        resourceType,
+        "upload"
+      );
     }
 
     const updated = await File.findByIdAndUpdate(req.params.id, data, {
@@ -181,14 +189,18 @@ export async function deleteFileRecord(req, res, next) {
       return next(createError("File record not found.", 404));
     }
 
-    if (file.publicId) {
-      try {
-        const resourceType = file.fileType === "audio" ? "video" : file.fileType === "image" ? "image" : "raw";
-        await deleteFile(file.publicId, resourceType, "upload");
-      } catch (err) {
-        // Silently continue if Cloudinary delete fails
-      }
-    }
+    const resourceType =
+      file.fileType === "audio"
+        ? "video"
+        : file.fileType === "image"
+        ? "image"
+        : "raw";
+
+    await deleteCloudinaryAsset(
+      file.publicId || file.fileUrl,
+      resourceType,
+      "upload"
+    );
 
     res.status(200).json({ success: true, message: "File deleted." });
   } catch (error) {

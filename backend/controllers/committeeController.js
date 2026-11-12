@@ -1,6 +1,6 @@
 // backend/controllers/committeeController.js
 import Committee from "../models/Committee.js";
-import { deleteFile } from "../utils/cloudinary.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -74,16 +74,16 @@ export async function updateMember(req, res, next) {
     }
 
     // If photo was changed, remove the old one from Cloudinary
-    if (
-      existingMember.imagePublicId &&
-      data.imagePublicId &&
-      existingMember.imagePublicId !== data.imagePublicId
-    ) {
-      try {
-        await deleteFile(existingMember.imagePublicId, "image", "upload");
-      } catch (cleanupError) {
-        console.error("Could not remove previous committee photo:", cleanupError.message);
-      }
+    const imageChanged =
+      (data.imagePublicId && data.imagePublicId !== existingMember.imagePublicId) ||
+      (data.imageUrl && data.imageUrl !== existingMember.imageUrl);
+
+    if (imageChanged) {
+      await deleteCloudinaryAsset(
+        existingMember.imagePublicId || existingMember.imageUrl,
+        "image",
+        "upload"
+      );
     }
 
     existingMember.set(data);
@@ -104,13 +104,11 @@ export async function deleteMember(req, res, next) {
       return next(createError("Committee member not found.", 404));
     }
 
-    if (member.imagePublicId) {
-      try {
-        await deleteFile(member.imagePublicId, "image", "upload");
-      } catch (cleanupError) {
-        console.error("Could not remove committee member photo:", cleanupError.message);
-      }
-    }
+    await deleteCloudinaryAsset(
+      member.imagePublicId || member.imageUrl,
+      "image",
+      "upload"
+    );
 
     await member.deleteOne();
 

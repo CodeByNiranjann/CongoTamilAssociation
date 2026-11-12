@@ -1,5 +1,6 @@
 // backend/controllers/eventController.js
 import Event from "../models/Event.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -91,14 +92,26 @@ export async function updateEvent(req, res, next) {
   try {
     const data = pickEventFields(req.body);
 
-    const event = await Event.findByIdAndUpdate(req.params.id, data, {
-      new: true,
-      runValidators: true,
-    });
+    const event = await Event.findById(req.params.id);
 
     if (!event) {
       return next(createError("Event not found.", 404));
     }
+
+    const imageChanged =
+      (data.imagePublicId && data.imagePublicId !== event.imagePublicId) ||
+      (data.imageUrl && data.imageUrl !== event.imageUrl);
+
+    if (imageChanged) {
+      await deleteCloudinaryAsset(
+        event.imagePublicId || event.imageUrl,
+        "image",
+        "upload"
+      );
+    }
+
+    event.set(data);
+    await event.save();
 
     res.status(200).json({ success: true, data: event });
   } catch (error) {
@@ -109,11 +122,19 @@ export async function updateEvent(req, res, next) {
 // DELETE /api/v1/events/:id   (admin only)
 export async function deleteEvent(req, res, next) {
   try {
-    const event = await Event.findByIdAndDelete(req.params.id);
+    const event = await Event.findById(req.params.id);
 
     if (!event) {
       return next(createError("Event not found.", 404));
     }
+
+    await deleteCloudinaryAsset(
+      event.imagePublicId || event.imageUrl,
+      "image",
+      "upload"
+    );
+
+    await event.deleteOne();
 
     res.status(200).json({ success: true, message: "Event deleted." });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Save, Plus, Trash2, Pencil } from "lucide-react";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../api.js";
+import UploadField from "../UploadField.jsx";
 
 const startingSchool = {
   introduction: "",
@@ -119,6 +120,22 @@ function TamilSchool() {
     loadAnnouncements();
   }, [loadAnnouncements]);
 
+  function addImage(url) {
+    if (!url) return;
+    setImagesText((previous) => {
+      if (previous.trim() === "") {
+        return url;
+      }
+      return previous + "\n" + url;
+    });
+  }
+
+  function removeImage(urlToRemove) {
+    const list = linesToList(imagesText);
+    const updated = list.filter((url) => url !== urlToRemove);
+    setImagesText(updated.join("\n"));
+  }
+
   // Save school information to the backend
   async function handleSchoolSubmit(event) {
     event.preventDefault();
@@ -190,10 +207,10 @@ function TamilSchool() {
     setSchoolServerError("");
   }
 
-  // Delete school information. This requires a matching backend DELETE route.
+  // Delete school information.
   async function handleDeleteAllSchoolInfo() {
     const confirmed = window.confirm(
-      "Delete all Tamil School information from the database? This cannot be undone."
+      "Delete all Tamil School information from the database and Cloudinary? This cannot be undone."
     );
 
     if (!confirmed) return;
@@ -380,6 +397,8 @@ function TamilSchool() {
     ? "Save Changes"
     : "Add Announcement";
 
+  const currentImageList = linesToList(imagesText);
+
   return (
     <div className="admin-section">
       <h2 className="admin-section-title">Tamil School</h2>
@@ -451,6 +470,66 @@ function TamilSchool() {
             <span className="admin-error">{schoolErrors.images}</span>
           )}
         </div>
+
+        <UploadField
+          id="ts-upload"
+          label="Upload a photo (adds it to the list)"
+          kind="image"
+          showLink={false}
+          onChange={addImage}
+        />
+
+        {currentImageList.length > 0 && (
+          <div className="admin-field">
+            <label>Current Photos ({currentImageList.length})</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginTop: "8px" }}>
+              {currentImageList.map((url, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    position: "relative",
+                    width: "100px",
+                    height: "80px",
+                    borderRadius: "6px",
+                    overflow: "hidden",
+                    border: "1px solid #ddd",
+                  }}
+                >
+                  <img
+                    src={url}
+                    alt={`School photo ${idx + 1}`}
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(url)}
+                    style={{
+                      position: "absolute",
+                      top: "2px",
+                      right: "2px",
+                      background: "rgba(220, 38, 38, 0.85)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: "22px",
+                      height: "22px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: 0,
+                      fontSize: "14px",
+                      lineHeight: "1",
+                    }}
+                    title="Remove image"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="admin-form-actions">
           <button

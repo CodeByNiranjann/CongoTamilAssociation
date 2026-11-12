@@ -1,5 +1,6 @@
 // backend/controllers/festivalController.js
 import Festival from "../models/Festival.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -90,14 +91,26 @@ export async function updateFestival(req, res, next) {
   try {
     const data = pickFestivalFields(req.body);
 
-    const festival = await Festival.findByIdAndUpdate(req.params.id, data, {
-      new: true,
-      runValidators: true,
-    });
+    const festival = await Festival.findById(req.params.id);
 
     if (!festival) {
       return next(createError("Festival not found.", 404));
     }
+
+    const imageChanged =
+      (data.imagePublicId && data.imagePublicId !== festival.imagePublicId) ||
+      (data.imageUrl && data.imageUrl !== festival.imageUrl);
+
+    if (imageChanged) {
+      await deleteCloudinaryAsset(
+        festival.imagePublicId || festival.imageUrl,
+        "image",
+        "upload"
+      );
+    }
+
+    festival.set(data);
+    await festival.save();
 
     res.status(200).json({ success: true, data: festival });
   } catch (error) {
@@ -108,11 +121,19 @@ export async function updateFestival(req, res, next) {
 // DELETE /api/v1/festivals/:id   (admin only)
 export async function deleteFestival(req, res, next) {
   try {
-    const festival = await Festival.findByIdAndDelete(req.params.id);
+    const festival = await Festival.findById(req.params.id);
 
     if (!festival) {
       return next(createError("Festival not found.", 404));
     }
+
+    await deleteCloudinaryAsset(
+      festival.imagePublicId || festival.imageUrl,
+      "image",
+      "upload"
+    );
+
+    await festival.deleteOne();
 
     res.status(200).json({ success: true, message: "Festival deleted." });
   } catch (error) {

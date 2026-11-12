@@ -13,6 +13,7 @@ const emptySectionForm = {
 function ByLaws() {
   const [intro, setIntro] = useState("");
   const [pdfUrl, setPdfUrl] = useState("");
+  const [pdfPublicId, setPdfPublicId] = useState("");
   const [sections, setSections] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -37,11 +38,12 @@ function ByLaws() {
 
     async function fetchByLaws() {
       try {
-        const result = await apiGet("/by-laws");
+        const result = await apiGet("/by-laws/admin", true);
 
         if (isCancelled === false) {
           setIntro(result.data.intro || "");
           setPdfUrl(result.data.pdfUrl || "");
+          setPdfPublicId(result.data.pdfPublicId || "");
           setSections(
             (result.data.sections || []).map(function (item) {
               return { heading: item.heading, text: item.text };
@@ -180,6 +182,7 @@ function ByLaws() {
       // Reset all local state to match the now-empty server record
       setIntro("");
       setPdfUrl("");
+      setPdfPublicId("");
       setSections([]);
       resetSectionForm();
       setConfirmingDeleteAll(false);
@@ -217,13 +220,14 @@ function ByLaws() {
     try {
       const result = await apiPut(
         "/by-laws",
-        { intro: intro.trim(), pdfUrl: cleanPdf, sections: sections },
+        { intro: intro.trim(), pdfUrl: cleanPdf, pdfPublicId: pdfPublicId, sections: sections },
         true
       );
 
       // Sync all fields back from server (server may trim / clean values)
       setIntro(result.data.intro || "");
       setPdfUrl(result.data.pdfUrl || "");
+      setPdfPublicId(result.data.pdfPublicId || "");
       setSections(
         result.data.sections.map(function (item) {
           return { heading: item.heading, text: item.text };
@@ -289,8 +293,11 @@ function ByLaws() {
           label="By-laws PDF"
           kind="pdf"
           value={pdfUrl}
-          onChange={function (url) {
+          onChange={function (url, publicId) {
             setPdfUrl(url);
+            if (publicId !== undefined) {
+              setPdfPublicId(publicId || (url ? pdfPublicId : ""));
+            }
           }}
           error={infoErrors.pdfUrl}
         />

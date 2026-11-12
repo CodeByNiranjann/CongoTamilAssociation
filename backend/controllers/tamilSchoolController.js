@@ -1,5 +1,6 @@
 // backend/controllers/tamilSchoolController.js
 import TamilSchool from "../models/TamilSchool.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -77,6 +78,7 @@ export async function getTamilSchool(req, res, next) {
 
 // PUT /api/v1/tamil-school   (admin only)
 // Creates the record on first save, then updates the same record.
+// Also deletes any removed images from Cloudinary.
 export async function saveTamilSchool(req, res, next) {
   try {
     const data = pickSchoolFields(req.body);
@@ -86,6 +88,15 @@ export async function saveTamilSchool(req, res, next) {
     if (!school) {
       school = await TamilSchool.create(data);
     } else {
+      if (Array.isArray(data.images) && Array.isArray(school.images)) {
+        const removedImages = school.images.filter(
+          (oldUrl) => !data.images.includes(oldUrl)
+        );
+        for (const oldUrl of removedImages) {
+          await deleteCloudinaryAsset(oldUrl, "image", "upload");
+        }
+      }
+
       school.set(data);
       await school.save();
     }
@@ -96,12 +107,23 @@ export async function saveTamilSchool(req, res, next) {
   }
 }
 
-
+// DELETE /api/v1/tamil-school   (admin only)
+// Deletes Tamil School record and removes all associated images from Cloudinary.
 export async function deleteTamilSchool(req, res, next) {
   try {
+    const schools = await TamilSchool.find();
+    for (const school of schools) {
+      if (Array.isArray(school.images)) {
+        for (const imageUrl of school.images) {
+          await deleteCloudinaryAsset(imageUrl, "image", "upload");
+        }
+      }
+    }
+
     await TamilSchool.deleteMany({});
 
     return res.status(200).json({
+      success: true,
       message: "Tamil School information deleted successfully.",
     });
   } catch (error) {

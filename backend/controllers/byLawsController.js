@@ -1,5 +1,6 @@
 // backend/controllers/byLawsController.js
 import ByLaws from "../models/ByLaws.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -84,6 +85,25 @@ export async function getByLaws(req, res, next) {
   }
 }
 
+// GET /api/v1/by-laws/admin   (admin only)
+// Returns the full record including pdfPublicId (needed for Cloudinary cleanup).
+export async function getByLawsAdmin(req, res, next) {
+  try {
+    const byLaws = await ByLaws.findOne().select("-__v");
+
+    if (!byLaws) {
+      return res.status(200).json({
+        success: true,
+        data: { intro: "", sections: [], pdfUrl: "", pdfPublicId: "" },
+      });
+    }
+
+    res.status(200).json({ success: true, data: byLaws });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // PUT /api/v1/by-laws   (admin only)
 // Creates the record on first save, then updates the same record.
 // Send the full "sections" list in the order it should be shown.
@@ -96,6 +116,18 @@ export async function saveByLaws(req, res, next) {
     if (!byLaws) {
       byLaws = await ByLaws.create(data);
     } else {
+      const pdfChanged =
+        (data.pdfPublicId && data.pdfPublicId !== byLaws.pdfPublicId) ||
+        (data.pdfUrl && data.pdfUrl !== byLaws.pdfUrl);
+
+      if (pdfChanged) {
+        await deleteCloudinaryAsset(
+          byLaws.pdfPublicId || byLaws.pdfUrl,
+          "raw",
+          "upload"
+        );
+      }
+
       byLaws.set(data);
       await byLaws.save();
     }
@@ -108,10 +140,19 @@ export async function saveByLaws(req, res, next) {
 
 // DELETE /api/v1/by-laws   (admin only)
 // Permanently removes the entire by-laws record from the database.
-// The public page will then return the empty-defaults response from getByLaws.
+// Also removes the stored PDF from Cloudinary if present.
 export async function deleteByLaws(req, res, next) {
   try {
-    await ByLaws.deleteOne({});
+    const byLaws = await ByLaws.findOne();
+
+    if (byLaws) {
+      await deleteCloudinaryAsset(
+        byLaws.pdfPublicId || byLaws.pdfUrl,
+        "raw",
+        "upload"
+      );
+      await byLaws.deleteOne();
+    }
 
     res.status(200).json({ success: true, message: "By-laws deleted." });
   } catch (error) {

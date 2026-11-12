@@ -1,5 +1,6 @@
 // backend/controllers/galleryController.js
 import Gallery from "../models/Gallery.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -90,14 +91,26 @@ export async function updateGallery(req, res, next) {
   try {
     const data = pickGalleryFields(req.body);
 
-    const gallery = await Gallery.findByIdAndUpdate(req.params.id, data, {
-      new: true,
-      runValidators: true,
-    });
+    const gallery = await Gallery.findById(req.params.id);
 
     if (!gallery) {
       return next(createError("Album not found.", 404));
     }
+
+    const coverChanged =
+      (data.coverImagePublicId && data.coverImagePublicId !== gallery.coverImagePublicId) ||
+      (data.coverImageUrl && data.coverImageUrl !== gallery.coverImageUrl);
+
+    if (coverChanged) {
+      await deleteCloudinaryAsset(
+        gallery.coverImagePublicId || gallery.coverImageUrl,
+        "image",
+        "upload"
+      );
+    }
+
+    gallery.set(data);
+    await gallery.save();
 
     res.status(200).json({ success: true, data: gallery });
   } catch (error) {
@@ -108,11 +121,19 @@ export async function updateGallery(req, res, next) {
 // DELETE /api/v1/gallery/:id   (admin only)
 export async function deleteGallery(req, res, next) {
   try {
-    const gallery = await Gallery.findByIdAndDelete(req.params.id);
+    const gallery = await Gallery.findById(req.params.id);
 
     if (!gallery) {
       return next(createError("Album not found.", 404));
     }
+
+    await deleteCloudinaryAsset(
+      gallery.coverImagePublicId || gallery.coverImageUrl,
+      "image",
+      "upload"
+    );
+
+    await gallery.deleteOne();
 
     res.status(200).json({ success: true, message: "Album deleted." });
   } catch (error) {

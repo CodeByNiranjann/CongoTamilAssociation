@@ -143,3 +143,82 @@ export async function deleteFile(publicId, resourceType, deliveryType) {
     type: deliveryType || "upload",
   });
 }
+
+// Extracts resourceType, deliveryType and publicId from a Cloudinary URL
+export function extractPublicIdFromUrl(url) {
+  if (!url || typeof url !== "string") return null;
+  if (!url.includes("res.cloudinary.com")) return null;
+
+  try {
+    const parsed = new URL(url);
+    const pathParts = parsed.pathname.split("/").filter(Boolean);
+    if (pathParts.length < 4) return null;
+
+    const resourceType = pathParts[1]; // image, raw, video
+    const deliveryType = pathParts[2]; // upload, authenticated
+
+    const afterDelivery = pathParts.slice(3);
+    let startIndex = 0;
+    while (startIndex < afterDelivery.length) {
+      const part = afterDelivery[startIndex];
+      if (/^v\d+$/.test(part)) {
+        startIndex++;
+        break;
+      }
+      if (part.includes(",") || part.includes("_")) {
+        startIndex++;
+      } else {
+        break;
+      }
+    }
+
+    const remainingParts = afterDelivery.slice(startIndex);
+    if (remainingParts.length === 0) return null;
+
+    const fullPathWithExt = remainingParts.join("/");
+
+    if (resourceType === "raw") {
+      return {
+        publicId: fullPathWithExt,
+        resourceType: "raw",
+        deliveryType: deliveryType || "upload",
+      };
+    } else {
+      const lastDotIndex = fullPathWithExt.lastIndexOf(".");
+      const publicId = lastDotIndex !== -1 ? fullPathWithExt.substring(0, lastDotIndex) : fullPathWithExt;
+      return {
+        publicId,
+        resourceType: resourceType || "image",
+        deliveryType: deliveryType || "upload",
+      };
+    }
+  } catch (err) {
+    console.error("Failed to parse Cloudinary URL:", url, err);
+    return null;
+  }
+}
+
+// Safely deletes an asset given either a publicId or a Cloudinary URL
+export async function deleteCloudinaryAsset(publicIdOrUrl, defaultResourceType = "image", deliveryType = "upload") {
+  if (!publicIdOrUrl) return;
+
+  try {
+    let publicId = publicIdOrUrl;
+    let resourceType = defaultResourceType;
+    let delType = deliveryType;
+
+    if (typeof publicIdOrUrl === "string" && (publicIdOrUrl.startsWith("http://") || publicIdOrUrl.startsWith("https://"))) {
+      const extracted = extractPublicIdFromUrl(publicIdOrUrl);
+      if (!extracted) {
+        return;
+      }
+      publicId = extracted.publicId;
+      resourceType = extracted.resourceType || defaultResourceType;
+      delType = extracted.deliveryType || deliveryType;
+    }
+
+    await deleteFile(publicId, resourceType, delType);
+  } catch (err) {
+    console.error("Cloudinary asset deletion error:", err.message || err);
+  }
+}

@@ -3,6 +3,7 @@ import {
   AfricaTamilCharalInfo,
   AfricaTamilCharalDocument,
 } from "../models/AfricaTamilCharal.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -108,6 +109,15 @@ export async function saveInfo(req, res, next) {
     if (!info) {
       info = await AfricaTamilCharalInfo.create(data);
     } else {
+      if (Array.isArray(data.images) && Array.isArray(info.images)) {
+        const removedImages = info.images.filter(
+          (oldUrl) => !data.images.includes(oldUrl)
+        );
+        for (const oldUrl of removedImages) {
+          await deleteCloudinaryAsset(oldUrl, "image", "upload");
+        }
+      }
+
       info.set(data);
       await info.save();
     }
@@ -119,13 +129,19 @@ export async function saveInfo(req, res, next) {
 }
 
 // DELETE /api/v1/africa-tamil-charal   (admin only)
-// Clears the introduction text and images list from the single info record.
+// Clears the introduction text and images list, and deletes any images from Cloudinary.
 export async function deleteInfo(req, res, next) {
   try {
     let info = await AfricaTamilCharalInfo.findOne();
 
     if (!info) {
       return res.status(200).json({ success: true, message: "Nothing to delete." });
+    }
+
+    if (Array.isArray(info.images)) {
+      for (const imgUrl of info.images) {
+        await deleteCloudinaryAsset(imgUrl, "image", "upload");
+      }
     }
 
     info.introduction = "";
@@ -184,15 +200,18 @@ export async function updateDocument(req, res, next) {
   try {
     const data = pickDocumentFields(req.body);
 
-    const document = await AfricaTamilCharalDocument.findByIdAndUpdate(
-      req.params.id,
-      data,
-      { new: true, runValidators: true }
-    );
+    const document = await AfricaTamilCharalDocument.findById(req.params.id);
 
     if (!document) {
       return next(createError("Document not found.", 404));
     }
+
+    if (data.link && data.link !== document.link) {
+      await deleteCloudinaryAsset(document.link, "raw", "upload");
+    }
+
+    document.set(data);
+    await document.save();
 
     res.status(200).json({ success: true, data: document });
   } catch (error) {
@@ -203,13 +222,17 @@ export async function updateDocument(req, res, next) {
 // DELETE /api/v1/africa-tamil-charal/documents/:id   (admin only)
 export async function deleteDocument(req, res, next) {
   try {
-    const document = await AfricaTamilCharalDocument.findByIdAndDelete(
-      req.params.id
-    );
+    const document = await AfricaTamilCharalDocument.findById(req.params.id);
 
     if (!document) {
       return next(createError("Document not found.", 404));
     }
+
+    if (document.link) {
+      await deleteCloudinaryAsset(document.link, "raw", "upload");
+    }
+
+    await document.deleteOne();
 
     res.status(200).json({ success: true, message: "Document deleted." });
   } catch (error) {

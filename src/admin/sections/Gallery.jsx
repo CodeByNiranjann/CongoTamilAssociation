@@ -10,6 +10,7 @@ const emptyForm = {
   date: "",
   description: "",
   coverImageUrl: "",
+  coverImagePublicId: "",
   albumLink: "",
   isPublished: true,
 };
@@ -129,6 +130,9 @@ function Gallery() {
       date: formData.date,
       description: formData.description.trim(),
       coverImageUrl: formData.coverImageUrl.trim(),
+      coverImagePublicId: formData.coverImagePublicId
+        ? formData.coverImagePublicId.trim()
+        : "",
       albumLink: formData.albumLink.trim(),
       isPublished: formData.isPublished,
     };
@@ -168,6 +172,7 @@ function Gallery() {
       date: toDateText(item.date),
       description: item.description || "",
       coverImageUrl: item.coverImageUrl || "",
+      coverImagePublicId: item.coverImagePublicId || "",
       albumLink: item.albumLink || "",
       isPublished: item.isPublished,
     });
@@ -246,7 +251,7 @@ function Gallery() {
       <table className="admin-table">
         <thead>
           <tr>
-            <th>Album</th>
+            <th>Event</th>
             <th>Date</th>
             <th>Status</th>
             <th>Actions</th>
@@ -393,8 +398,13 @@ function Gallery() {
           label="Cover image"
           kind="image"
           value={formData.coverImageUrl}
-          onChange={function (url) {
-            setFormData({ ...formData, coverImageUrl: url });
+          onChange={function (url, publicId) {
+            setFormData({
+              ...formData,
+              coverImageUrl: url,
+              coverImagePublicId:
+                publicId || (url ? formData.coverImagePublicId : ""),
+            });
           }}
           error={errors.coverImageUrl}
         />

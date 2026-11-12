@@ -1,6 +1,6 @@
 // backend/controllers/anthemController.js
 import Anthem from "../models/Anthem.js";
-import { deleteFile } from "../utils/cloudinary.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 // Builds an error with a status code, to pass to next()
 function createError(message, statusCode) {
@@ -60,16 +60,16 @@ export async function saveAnthem(req, res, next) {
     if (!anthem) {
       anthem = await Anthem.create(data);
     } else {
-      if (
-        anthem.audioPublicId &&
-        data.audioPublicId &&
-        anthem.audioPublicId !== data.audioPublicId
-      ) {
-        try {
-          await deleteFile(anthem.audioPublicId, "video", "upload");
-        } catch (cleanupError) {
-          console.error("Could not remove previous anthem audio:", cleanupError.message);
-        }
+      const audioChanged =
+        (data.audioPublicId && data.audioPublicId !== anthem.audioPublicId) ||
+        (data.audioUrl && data.audioUrl !== anthem.audioUrl);
+
+      if (audioChanged) {
+        await deleteCloudinaryAsset(
+          anthem.audioPublicId || anthem.audioUrl,
+          "video",
+          "upload"
+        );
       }
       anthem.set(data);
       await anthem.save();
@@ -94,13 +94,11 @@ export async function deleteAnthem(req, res, next) {
       });
     }
 
-    if (anthem.audioPublicId) {
-      try {
-        await deleteFile(anthem.audioPublicId, "video", "upload");
-      } catch (cleanupError) {
-        console.error("Could not remove anthem audio from Cloudinary:", cleanupError.message);
-      }
-    }
+    await deleteCloudinaryAsset(
+      anthem.audioPublicId || anthem.audioUrl,
+      "video",
+      "upload"
+    );
 
     await Anthem.deleteMany({});
 

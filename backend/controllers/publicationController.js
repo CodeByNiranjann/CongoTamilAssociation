@@ -1,5 +1,6 @@
 // backend/controllers/publicationController.js
 import Publication from "../models/Publication.js";
+import { deleteCloudinaryAsset } from "../utils/cloudinary.js";
 
 const allowedSections = ["general", "africa-tamil-charal"];
 
@@ -139,15 +140,31 @@ export async function updatePublication(req, res, next) {
   try {
     const data = pickPublicationFields(req.body);
 
-    const publication = await Publication.findByIdAndUpdate(
-      req.params.id,
-      data,
-      { new: true, runValidators: true }
-    );
+    const publication = await Publication.findById(req.params.id);
 
     if (!publication) {
       return next(createError("Publication not found.", 404));
     }
+
+    const coverChanged =
+      (data.coverImagePublicId && data.coverImagePublicId !== publication.coverImagePublicId) ||
+      (data.coverImageUrl && data.coverImageUrl !== publication.coverImageUrl);
+
+    if (coverChanged) {
+      await deleteCloudinaryAsset(
+        publication.coverImagePublicId || publication.coverImageUrl,
+        "image",
+        "upload"
+      );
+    }
+
+    const pdfChanged = data.pdfLink && data.pdfLink !== publication.pdfLink;
+    if (pdfChanged) {
+      await deleteCloudinaryAsset(publication.pdfLink, "raw", "upload");
+    }
+
+    publication.set(data);
+    await publication.save();
 
     res.status(200).json({ success: true, data: publication });
   } catch (error) {
@@ -158,11 +175,23 @@ export async function updatePublication(req, res, next) {
 // DELETE /api/v1/publications/:id   (admin only)
 export async function deletePublication(req, res, next) {
   try {
-    const publication = await Publication.findByIdAndDelete(req.params.id);
+    const publication = await Publication.findById(req.params.id);
 
     if (!publication) {
       return next(createError("Publication not found.", 404));
     }
+
+    await deleteCloudinaryAsset(
+      publication.coverImagePublicId || publication.coverImageUrl,
+      "image",
+      "upload"
+    );
+
+    if (publication.pdfLink) {
+      await deleteCloudinaryAsset(publication.pdfLink, "raw", "upload");
+    }
+
+    await publication.deleteOne();
 
     res.status(200).json({ success: true, message: "Publication deleted." });
   } catch (error) {
