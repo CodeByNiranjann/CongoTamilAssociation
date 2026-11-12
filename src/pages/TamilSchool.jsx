@@ -76,7 +76,13 @@ function TamilSchool() {
     <p className="empty-state">School information will be added soon.</p>
   );
   if (school.introduction) {
-    introContent = <p>{school.introduction}</p>;
+    introContent = school.introduction.split("\n\n").map(function (para, i) {
+      return (
+        <p key={i} className="about-history-paragraph">
+          {para}
+        </p>
+      );
+    });
   }
 
   let imagesSection = null;
